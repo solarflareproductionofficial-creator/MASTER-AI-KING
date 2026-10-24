@@ -1,0 +1,6 @@
+{
+  "name": "MASTER AI - Akıllı Günlük Yaşam & Çalışma Asistanı",
+  "description": "Günlük hayat, iş, kodlama, araştırma, yazarlık ve interaktif canlı stüdyo için çok yönlü yapay zeka asistanı.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

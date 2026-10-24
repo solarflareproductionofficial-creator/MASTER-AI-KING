@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0d0f17;
+  --sb: #141724;
+  --tx: #ececec;
+  --mu: #9a9aa3;
+  --ac: #10a37f;
+  --ac2: #8f74ff;
+  --acg: linear-gradient(135deg, #10a37f, #8f74ff);
+  --bd: rgba(255, 255, 255, 0.1);
+  --in: #1b1e2e;
+  --cd: #0a0b12;
+  --hv: rgba(255, 255, 255, 0.06);
+  --gl: rgba(20, 23, 36, 0.72);
+  --gb: rgba(255, 255, 255, 0.08);
+  --fs: 15px;
+  --mw: 760px;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --sb: #f7f7f8;
+  --tx: #1a1a1f;
+  --mu: #6b6f80;
+  --bd: #e3e4ea;
+  --in: #f4f4f6;
+  --cd: #f1f2f6;
+  --hv: #ececf0;
+  --gl: rgba(255, 255, 255, 0.85);
+  --gb: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="amoled"] {
+  --bg: #000000;
+  --sb: #050505;
+  --tx: #f2f2f2;
+  --mu: #8e8e98;
+  --bd: #1c1c22;
+  --in: #101014;
+  --cd: #08080a;
+  --hv: #16161b;
+  --gl: rgba(10, 10, 14, 0.85);
+  --gb: rgba(255, 255, 255, 0.07);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--tx);
+  overflow: hidden;
+  height: 100vh;
+  margin: 0;
+  font-size: var(--fs);
+}
+
+h1, h2, h3, h4, .brand-font {
+  font-family: 'Sora', 'Inter', system-ui, sans-serif;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ac) 40%, transparent) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ac) 35%, transparent);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Animations */
+@keyframes fl {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6vw, 4vh) scale(1.12); }
+  100% { transform: translate(-4vw, 3vh) scale(0.95); }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gsh {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes flo {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes blk {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.08); }
+}
+
+@keyframes wv {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(5px, -12px); }
+}
+
+@keyframes scn {
+  0%, 100% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+}
+
+@keyframes hop {
+  30% { transform: translateY(-18px) scale(1.06); }
+  60% { transform: translateY(0); }
+  80% { transform: translateY(-4px); }
+}
+
+@keyframes pu {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.anim-pop {
+  animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.anim-pulse {
+  animation: pu 1.4s ease-in-out infinite;
+}
+
+.anim-hop {
+  animation: hop 0.6s ease;
+}
+
+/* Mascot SVG Keyframes */
+.mas {
+  animation: flo 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 16px color-mix(in srgb, var(--ac) 40%, transparent));
+}
+.mas .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blk 4.2s infinite;
+  filter: drop-shadow(0 0 4px var(--ac));
+}
+.mas .hand {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: wv 2s ease-in-out infinite;
+}
+.mas.busy-scan .eye {
+  animation: scn 0.9s ease-in-out infinite;
+}
+.mas.busy-scan .ant circle {
+  animation: pu 0.6s infinite;
+}
