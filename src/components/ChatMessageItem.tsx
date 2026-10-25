@@ -17,6 +17,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { ChatMessage, Language } from '../types';
+import { TRANSLATIONS } from '../data/translations';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -39,6 +40,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   onVote,
   isLastAssistant = false,
 }) => {
+  const common = (TRANSLATIONS[lang] || TRANSLATIONS.en).common;
   const isUser = message.role === 'user';
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showSvgCode, setShowSvgCode] = useState<Record<number, boolean>>({});
@@ -199,10 +201,10 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   type="button"
                   onClick={() => onRunInStudio(code)}
                   className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm flex items-center gap-1 transition-all"
-                  title="Run directly in live game studio"
+                  title={common.runInStudioTitle}
                 >
                   <Play className="w-3 h-3" />
-                  <span>Stüdyo'da Çalıştır</span>
+                  <span>{common.runInStudio}</span>
                 </button>
               )}
 
@@ -211,17 +213,17 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 type="button"
                 onClick={() => handleCopy(code, index)}
                 className="px-2 py-1 rounded-md text-xs hover:bg-[var(--hv)] hover:text-[var(--tx)] transition-colors flex items-center gap-1"
-                title="Copy code"
+                title={common.copy}
               >
                 {copiedIndex === index ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Kopyalandı</span>
+                    <span className="text-emerald-400">{common.copied}</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Kopyala</span>
+                    <span>{common.copy}</span>
                   </>
                 )}
               </button>
@@ -257,7 +259,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   <div className="flex flex-col text-left">
                     <span className="font-medium max-w-[140px] truncate">{file.name}</span>
                     <span className="text-[10px] text-[var(--mu)]">
-                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : 'Görsel'} • İncelendi
+                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''} • {common.imageAnalyzed}
                     </span>
                   </div>
                 </div>
@@ -271,7 +273,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   <div className="flex flex-col text-left">
                     <span className="font-medium max-w-[140px] truncate">{file.name}</span>
                     <span className="text-[10px] text-[var(--mu)]">
-                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : 'Belge'} • Analiz Edildi
+                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''} • {common.docAnalyzed}
                     </span>
                   </div>
                 </div>
@@ -295,7 +297,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             type="button"
             onClick={() => onEditUserMessage(message.content)}
             className="absolute -left-8 top-3 p-1.5 text-[var(--mu)] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Mesajı düzenle"
+            title={common.editMessage}
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
@@ -315,20 +317,20 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 className={`p-1 rounded-md hover:bg-[var(--hv)] hover:text-emerald-400 transition-colors ${
                   message.vote === 1 ? 'text-emerald-400 bg-emerald-500/10' : ''
                 }`}
-                title="Faydalı yanıt"
+                title={common.helpful}
               >
                 <ThumbsUp className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  const reason = prompt('Neyi beğenmediniz? (İsteğe bağlı):');
+                  const reason = prompt(common.improvePrompt);
                   onVote(-1, reason || undefined);
                 }}
                 className={`p-1 rounded-md hover:bg-[var(--hv)] hover:text-red-400 transition-colors ${
                   message.vote === -1 ? 'text-red-400 bg-red-500/10' : ''
                 }`}
-                title="Geliştirilmeli"
+                title={common.improve}
               >
                 <ThumbsDown className="w-3.5 h-3.5" />
               </button>
@@ -343,7 +345,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               className={`p-1 rounded-md hover:bg-[var(--hv)] hover:text-[var(--tx)] transition-colors flex items-center gap-1 ${
                 isSpeaking ? 'text-[var(--ac)] animate-pulse' : ''
               }`}
-              title="Sesli Oku"
+              title={common.readAloud}
             >
               <Volume2 className="w-3.5 h-3.5" />
             </button>
@@ -353,7 +355,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               type="button"
               onClick={() => onPinToProject(message.content)}
               className="p-1 rounded-md hover:bg-[var(--hv)] hover:text-[var(--tx)] transition-colors flex items-center gap-1"
-              title="Proje Notlarına Kaydet"
+              title={common.pinToProject}
             >
               <BookmarkPlus className="w-3.5 h-3.5" />
             </button>
@@ -364,7 +366,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 type="button"
                 onClick={onRegenerate}
                 className="p-1 rounded-md hover:bg-[var(--hv)] hover:text-[var(--tx)] transition-colors flex items-center gap-1"
-                title="Tekrar Üret"
+                title={common.regenerate}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>

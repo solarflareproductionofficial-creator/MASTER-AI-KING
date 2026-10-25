@@ -11,7 +11,6 @@ import {
   Check,
   Download,
   Upload,
-  Lock,
 } from 'lucide-react';
 import {
   ThemeSettings,
@@ -19,6 +18,7 @@ import {
   GameProject,
   Language,
 } from '../types';
+import { TRANSLATIONS } from '../data/translations';
 
 interface CustomizerModalProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ interface CustomizerModalProps {
   settings: ThemeSettings;
   onUpdateSettings: (newSettings: ThemeSettings) => void;
   onResetSettings: () => void;
+  lang: Language;
 }
 
 const GRADIENT_PRESETS: { name: string; colors: string[] }[] = [
@@ -47,8 +48,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   settings,
   onUpdateSettings,
   onResetSettings,
+  lang,
 }) => {
   if (!isOpen) return null;
+  const t = (TRANSLATIONS[lang] || TRANSLATIONS.en).modals.customizer;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-pop">
@@ -56,7 +59,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         <div className="flex items-center justify-between pb-4 border-b border-[var(--bd)] mb-4">
           <h2 className="text-lg font-bold brand-font flex items-center gap-2 text-[var(--tx)]">
             <Palette className="w-5 h-5 text-[var(--ac)]" />
-            Görünüm & Tema Özelleştir
+            {t.title}
           </h2>
           <button
             onClick={onClose}
@@ -70,7 +73,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           {/* Gradient Palettes */}
           <div>
             <label className="block text-xs font-semibold text-[var(--mu)] uppercase tracking-wider mb-2">
-              Hazır Renk Geçişleri
+              {t.gradientPresets}
             </label>
             <div className="grid grid-cols-5 gap-2">
               {GRADIENT_PRESETS.map((p) => {
@@ -104,14 +107,14 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           {/* Theme Mode */}
           <div>
             <label className="block text-xs font-semibold text-[var(--mu)] uppercase tracking-wider mb-2">
-              Tema Modu
+              {t.themeMode}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {[
-                { id: 'dark', label: 'Koyu' },
-                { id: 'light', label: 'Açık' },
-                { id: 'amoled', label: 'AMOLED' },
-                { id: 'auto', label: 'Otomatik' },
+                { id: 'dark', label: t.modes.dark },
+                { id: 'light', label: t.modes.light },
+                { id: 'amoled', label: t.modes.amoled },
+                { id: 'auto', label: t.modes.auto },
               ].map((m) => (
                 <button
                   key={m.id}
@@ -131,13 +134,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           {/* Font Size */}
           <div>
             <label className="block text-xs font-semibold text-[var(--mu)] uppercase tracking-wider mb-2">
-              Yazı Boyutu
+              {t.fontSize}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { val: 14, label: 'Küçük (14px)' },
-                { val: 15, label: 'Normal (15px)' },
-                { val: 17, label: 'Büyük (17px)' },
+                { val: 14, label: t.sizes.small },
+                { val: 15, label: t.sizes.normal },
+                { val: 17, label: t.sizes.large },
               ].map((s) => (
                 <button
                   key={s.val}
@@ -157,13 +160,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           {/* Chat Width */}
           <div>
             <label className="block text-xs font-semibold text-[var(--mu)] uppercase tracking-wider mb-2">
-              Sohbet Genişliği
+              {t.chatWidth}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { val: 680, label: 'Dar (680px)' },
-                { val: 760, label: 'Orta (760px)' },
-                { val: 920, label: 'Geniş (920px)' },
+                { val: 680, label: t.widths.narrow },
+                { val: 760, label: t.widths.medium },
+                { val: 920, label: t.widths.wide },
               ].map((w) => (
                 <button
                   key={w.val}
@@ -186,12 +189,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--in)] border border-[var(--bd)]">
               <div>
                 <span className="font-semibold text-sm text-[var(--tx)]">
-                  {settings.allowEmojis ? '😃 Emojiler: Açık' : 'Emojiler: Kapalı (Sevmeyenler için)'}
+                  {settings.allowEmojis ? `🙂 ${t.emojiTitle}: ON` : `${t.emojiTitle}: OFF`}
                 </span>
                 <p className="text-xs text-[var(--mu)]">
-                  {settings.allowEmojis
-                    ? 'Arayüzde ve yanıtlarda emojiler gösterilir'
-                    : 'Emojiler arayüzden ve yapay zeka yanıtlarından tamamen gizlenir'}
+                  {settings.allowEmojis ? t.emojiSubOn : t.emojiSubOff}
                 </p>
               </div>
               <input
@@ -204,8 +205,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-medium text-[var(--tx)]">Master Bot Maskotu</span>
-                <p className="text-xs text-[var(--mu)]">Ekranın sağ altında etkileşimli robot maskot</p>
+                <span className="font-medium text-[var(--tx)]">{t.mascotTitle}</span>
+                <p className="text-xs text-[var(--mu)]">{t.mascotDesc}</p>
               </div>
               <input
                 type="checkbox"
@@ -217,8 +218,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-medium text-[var(--tx)]">Arka Plan Işık Efektleri</span>
-                <p className="text-xs text-[var(--mu)]">Yumuşak hareketli neon orblar</p>
+                <span className="font-medium text-[var(--tx)]">{t.bgOrbsTitle}</span>
+                <p className="text-xs text-[var(--mu)]">{t.bgOrbsDesc}</p>
               </div>
               <input
                 type="checkbox"
@@ -236,13 +237,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             onClick={onResetSettings}
             className="px-3 py-1.5 text-xs text-[var(--mu)] hover:text-[var(--tx)] hover:underline"
           >
-            Varsayılana Sıfırla
+            {t.resetDefault}
           </button>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--acg)] text-white hover:opacity-95 shadow"
           >
-            Tamam
+            {t.done}
           </button>
         </div>
       </div>
@@ -274,6 +275,8 @@ export const PluginsModal: React.FC<PluginsModalProps> = ({
   const [newPrompt, setNewPrompt] = useState('');
 
   if (!isOpen) return null;
+  const t = (TRANSLATIONS[lang] || TRANSLATIONS.en).modals.plugins;
+  const common = (TRANSLATIONS[lang] || TRANSLATIONS.en).common;
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,7 +292,7 @@ export const PluginsModal: React.FC<PluginsModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-[var(--bd)] mb-4">
           <h2 className="text-lg font-bold brand-font flex items-center gap-2 text-[var(--tx)]">
             <Puzzle className="w-5 h-5 text-[var(--ac)]" />
-            Eklentiler (Plugins)
+            {t.title}
           </h2>
           <button
             onClick={onClose}
@@ -300,7 +303,7 @@ export const PluginsModal: React.FC<PluginsModalProps> = ({
         </div>
 
         <p className="text-xs text-[var(--mu)] mb-4">
-          MASTER AI'a oyun geliştirme sürecinde ekstra uzmanlıklar kazandırmak için eklentileri açın veya kendiniz ekleyin.
+          {t.desc}
         </p>
 
         {/* Plugins List */}
@@ -324,7 +327,7 @@ export const PluginsModal: React.FC<PluginsModalProps> = ({
                   <button
                     onClick={() => onDeleteCustomPlugin(p.id)}
                     className="p-1.5 text-[var(--mu)] hover:text-red-400"
-                    title="Sil"
+                    title={common.delete}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -344,18 +347,18 @@ export const PluginsModal: React.FC<PluginsModalProps> = ({
         <form onSubmit={handleAdd} className="p-3.5 rounded-xl border border-[var(--bd)] bg-[var(--sb)]/60">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--ac)] mb-2 flex items-center gap-1">
             <Plus className="w-3.5 h-3.5" />
-            Kendi Eklentini Oluştur
+            {t.customTitle}
           </h4>
           <input
             type="text"
-            placeholder="Eklenti Adı (örn: 🎵 Retro Chiptune Bestecisi)"
+            placeholder={t.namePlaceholder}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             className="w-full px-3 py-2 bg-[var(--in)] border border-[var(--bd)] rounded-lg text-xs text-[var(--tx)] mb-2 focus:outline-none focus:border-[var(--ac)]"
           />
           <textarea
             rows={2}
-            placeholder="Talimat (Yapay zekanın ne yapmasını istiyorsun?)"
+            placeholder={t.promptPlaceholder}
             value={newPrompt}
             onChange={(e) => setNewPrompt(e.target.value)}
             className="w-full px-3 py-2 bg-[var(--in)] border border-[var(--bd)] rounded-lg text-xs text-[var(--tx)] mb-2 focus:outline-none focus:border-[var(--ac)] resize-none"
@@ -365,7 +368,7 @@ export const PluginsModal: React.FC<PluginsModalProps> = ({
             disabled={!newName.trim() || !newPrompt.trim()}
             className="w-full py-2 rounded-lg text-xs font-semibold bg-[var(--acg)] text-white disabled:opacity-50 transition-opacity"
           >
-            Eklentiyi Ekle
+            {t.addBtn}
           </button>
         </form>
       </div>
@@ -383,6 +386,7 @@ interface ProjectsModalProps {
   onAddProject: (name: string, notes: string) => void;
   onUpdateProject: (id: string, notes: string) => void;
   onDeleteProject: (id: string) => void;
+  lang: Language;
 }
 
 export const ProjectsModal: React.FC<ProjectsModalProps> = ({
@@ -394,11 +398,14 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   onAddProject,
   onUpdateProject,
   onDeleteProject,
+  lang,
 }) => {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
 
   if (!isOpen) return null;
+  const t = (TRANSLATIONS[lang] || TRANSLATIONS.en).modals.projects;
+  const common = (TRANSLATIONS[lang] || TRANSLATIONS.en).common;
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,7 +421,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-[var(--bd)] mb-4">
           <h2 className="text-lg font-bold brand-font flex items-center gap-2 text-[var(--tx)]">
             <FolderKanban className="w-5 h-5 text-[var(--ac)]" />
-            Oyun Projeleri & Hafıza
+            {t.title}
           </h2>
           <button
             onClick={onClose}
@@ -425,7 +432,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
         </div>
 
         <p className="text-xs text-[var(--mu)] mb-4">
-          Projeye yazdığınız notlar (hikâye, karakterler, mekanikler, kurallar), o projeye bağlı tüm sohbetlerde MASTER AI'a arka plan bilgisi olarak aktarılır.
+          {t.desc}
         </p>
 
         {/* Existing Projects */}
@@ -444,7 +451,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                     <span className="font-semibold text-sm text-[var(--tx)]">📁 {p.name}</span>
                     {isSelected && (
                       <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">
-                        Aktif
+                        {t.activeBadge}
                       </span>
                     )}
                   </div>
@@ -454,12 +461,13 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                         onClick={() => onSelectProject(p.id)}
                         className="px-2.5 py-1 text-xs rounded-lg bg-[var(--in)] hover:bg-[var(--hv)] text-[var(--tx)]"
                       >
-                        Seç
+                        {t.selectBtn}
                       </button>
                     )}
                     <button
                       onClick={() => onDeleteProject(p.id)}
                       className="p-1.5 text-[var(--mu)] hover:text-red-400"
+                      title={common.delete}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -469,7 +477,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                 <textarea
                   defaultValue={p.notes}
                   onBlur={(e) => onUpdateProject(p.id, e.target.value)}
-                  placeholder="Oyun notları: hikâye, karakterler, kurallar, kod mimarisi..."
+                  placeholder={t.notesPlaceholder}
                   rows={3}
                   className="w-full p-2.5 bg-[#090a10] border border-[var(--bd)] rounded-lg text-xs text-[var(--tx)] resize-none focus:outline-none focus:border-[var(--ac)] font-mono"
                 />
@@ -482,18 +490,18 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
         <form onSubmit={handleAdd} className="p-3.5 rounded-xl border border-[var(--bd)] bg-[var(--sb)]/60">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--ac)] mb-2 flex items-center gap-1">
             <Plus className="w-3.5 h-3.5" />
-            Yeni Oyun Projesi Ekle
+            {t.newProject}
           </h4>
           <input
             type="text"
-            placeholder="Proje Adı (örn: Cyber Rogue: 2099)"
+            placeholder={t.namePlaceholder}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full px-3 py-2 bg-[var(--in)] border border-[var(--bd)] rounded-lg text-xs text-[var(--tx)] mb-2 focus:outline-none focus:border-[var(--ac)]"
           />
           <textarea
             rows={2}
-            placeholder="Oyun Notları (Karakterler, düşmanlar, temel kurallar)"
+            placeholder={t.notesPlaceholder}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="w-full px-3 py-2 bg-[var(--in)] border border-[var(--bd)] rounded-lg text-xs text-[var(--tx)] mb-2 focus:outline-none focus:border-[var(--ac)] resize-none"
@@ -503,7 +511,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
             disabled={!name.trim()}
             className="w-full py-2 rounded-lg text-xs font-semibold bg-[var(--acg)] text-white disabled:opacity-50 transition-opacity"
           >
-            Projeyi Oluştur
+            {t.createBtn}
           </button>
         </form>
       </div>
@@ -517,6 +525,7 @@ interface PrivacyModalProps {
   onClose: () => void;
   onExportBackup: () => void;
   onImportBackup: (file: File) => void;
+  lang: Language;
 }
 
 export const PrivacyModal: React.FC<PrivacyModalProps> = ({
@@ -524,8 +533,10 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({
   onClose,
   onExportBackup,
   onImportBackup,
+  lang,
 }) => {
   if (!isOpen) return null;
+  const t = (TRANSLATIONS[lang] || TRANSLATIONS.en).modals.privacy;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-pop">
@@ -533,7 +544,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-[var(--bd)] mb-4">
           <h2 className="text-lg font-bold brand-font flex items-center gap-2 text-[var(--tx)]">
             <ShieldCheck className="w-5 h-5 text-[var(--ac)]" />
-            Gizlilik, Güvenlik & Yedek
+            {t.title}
           </h2>
           <button
             onClick={onClose}
@@ -545,10 +556,9 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({
 
         <div className="space-y-4 text-xs text-[var(--tx)] leading-relaxed">
           <div className="p-3.5 rounded-xl bg-[var(--in)] border border-[var(--bd)]">
-            <div className="font-semibold text-sm mb-1 text-[var(--ac)]">MASTER AI Gizlilik İlkesi</div>
+            <div className="font-semibold text-sm mb-1 text-[var(--ac)]">{t.policyTitle}</div>
             <p className="text-[var(--mu)]">
-              MASTER AI, GAME WORKS STUDIO tarafından geliştirilmiştir. Stüdyo mesajlarınızın içeriğini okumaz veya depolamaz.
-              Sohbet geçmişiniz ve oyun projeleriniz güvenle bu tarayıcı cihazınızda saklanır.
+              {t.policyDesc}
             </p>
           </div>
 
@@ -556,10 +566,10 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({
           <div className="p-3.5 rounded-xl bg-[var(--in)] border border-[var(--bd)] space-y-2.5">
             <div className="font-semibold text-sm text-[var(--tx)] flex items-center gap-1.5">
               <Download className="w-4 h-4 text-[var(--ac)]" />
-              Sohbet ve Proje Yedekleme
+              {t.backupTitle}
             </div>
             <p className="text-[var(--mu)]">
-              Tüm sohbetlerinizi ve proje notlarınızı tek tıklamayla JSON dosyası olarak dışa aktarabilir veya geri yükleyebilirsiniz.
+              {t.backupDesc}
             </p>
             <div className="flex items-center gap-2 pt-1">
               <button
@@ -567,11 +577,11 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({
                 className="flex-1 py-2 px-3 rounded-lg bg-[var(--acg)] text-white font-medium flex items-center justify-center gap-1.5 hover:opacity-90"
               >
                 <Download className="w-3.5 h-3.5" />
-                Dışa Aktar (JSON)
+                {t.exportBtn}
               </button>
               <label className="flex-1 py-2 px-3 rounded-lg border border-[var(--bd)] bg-[var(--sb)] text-[var(--tx)] font-medium flex items-center justify-center gap-1.5 hover:bg-[var(--hv)] cursor-pointer">
                 <Upload className="w-3.5 h-3.5" />
-                İçe Aktar
+                {t.importBtn}
                 <input
                   type="file"
                   accept=".json,application/json"
@@ -592,7 +602,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--acg)] text-white hover:opacity-95"
           >
-            Anladım, Kapat
+            {t.closeBtn}
           </button>
         </div>
       </div>

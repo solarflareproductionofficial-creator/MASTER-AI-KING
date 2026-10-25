@@ -25,6 +25,11 @@ import {
   RefreshCw,
   Send,
   Radio,
+  Box,
+  Music,
+  Video,
+  MapPin,
+  Disc,
 } from 'lucide-react';
 
 import {
@@ -51,6 +56,11 @@ import {
   ProjectsModal,
   PrivacyModal,
 } from './components/Modals';
+import { ThreeStudio } from './components/ThreeStudio';
+import { ThreeGame } from './components/ThreeGame';
+import { MusicStudioModal } from './components/MusicStudioModal';
+import { VideoStudioModal } from './components/VideoStudioModal';
+import { MapsModal } from './components/MapsModal';
 
 import { detectUserLanguage } from './utils/langDetect';
 import { formatWithEmojiPreference } from './utils/emoji';
@@ -71,8 +81,8 @@ const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   chatWidth: 760,
   bubbleStyle: 'soft',
   animations: 'normal',
-  showMascot: false, // Sade ve saf - minimalist by default, no cartoon mascot clutter
-  bgOrbs: false,      // Sade ve saf - clean modern workspace without distracting background orbs
+  showMascot: true, // Auto mascot enabled by default ("oto maskot açık olsun")
+  bgOrbs: false,
   allowEmojis: true,
   emojiDensity: 'normal',
 };
@@ -83,12 +93,17 @@ export default function App() {
     return detectUserLanguage();
   });
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const common = t.common || TRANSLATIONS.en.common;
 
-  // Theme Settings
+  // Theme Settings - Auto mascot is ON by default
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>(() => {
     try {
       const saved = localStorage.getItem('masterai_theme');
-      return saved ? { ...DEFAULT_THEME_SETTINGS, ...JSON.parse(saved) } : DEFAULT_THEME_SETTINGS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_THEME_SETTINGS, ...parsed, showMascot: true };
+      }
+      return DEFAULT_THEME_SETTINGS;
     } catch {
       return DEFAULT_THEME_SETTINGS;
     }
@@ -111,11 +126,12 @@ export default function App() {
   const [projects, setProjects] = useState<GameProject[]>(() => {
     try {
       const saved = localStorage.getItem('masterai_projects');
+      const initialProjectText = (TRANSLATIONS[lang] || TRANSLATIONS.en).modals.projects;
       return saved ? JSON.parse(saved) : [
         {
           id: 'proj_default',
-          name: 'Cyber Rogue Game',
-          notes: 'Mekanik: Roguelike dungeon crawler, grid tabanlı hareket, neon piksel grafikler, procedural odalar.',
+          name: initialProjectText?.defaultName || 'Universal Workspace',
+          notes: initialProjectText?.defaultNotes || 'Daily tasks, workflow goals, reference notes, and creative ideas.',
           createdAt: Date.now(),
         },
       ];
@@ -162,6 +178,13 @@ export default function App() {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Creative Suite Modals (Three.js 3D, Game, Music, Video, Maps)
+  const [isThreeStudioOpen, setIsThreeStudioOpen] = useState(false);
+  const [isThreeGameOpen, setIsThreeGameOpen] = useState(false);
+  const [isMusicStudioOpen, setIsMusicStudioOpen] = useState(false);
+  const [isVideoStudioOpen, setIsVideoStudioOpen] = useState(false);
+  const [isMapsOpen, setIsMapsOpen] = useState(false);
+
   // Chat Input & Streaming
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -169,9 +192,23 @@ export default function App() {
   const [streamingBuffer, setStreamingBuffer] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Mascot Tip Bubble
+  // Mascot Tip Bubble & Auto Mascot Activation
   const [mascotBubble, setMascotBubble] = useState<string | null>(null);
   const tipIndexRef = useRef(0);
+
+  // Proactive Auto Mascot Welcome Speech
+  useEffect(() => {
+    const greetingTimer = setTimeout(() => {
+      const msg =
+        lang === 'tr'
+          ? '👋 Selam! Yapay zekana Three.js 3D Sahne Stüdyosu, 3D Oyun, Lyria Müzik, Omni Video ve Google Maps eklendi! Maskotun her zaman yanında!'
+          : '👋 Hi! Three.js 3D Studio, 3D Game, Lyria Music, Omni Video, and Google Maps are live! Auto Mascot is active to assist you!';
+      setMascotBubble(msg);
+      setTimeout(() => setMascotBubble(null), 6500);
+    }, 1000);
+
+    return () => clearTimeout(greetingTimer);
+  }, [lang]);
 
   // Auto scroll ref
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -248,7 +285,7 @@ export default function App() {
     const newId = 'chat_' + Date.now();
     const newSession: ChatSession = {
       id: newId,
-      title: 'Yeni Oyun Sohbeti',
+      title: common.newChatDefaultTitle,
       msgs: [],
       projId: currentProjectId,
       createdAt: Date.now(),
@@ -287,7 +324,7 @@ export default function App() {
     }
 
     if (!isSpeechRecognitionSupported()) {
-      setMicErrorMessage('Tarayıcınızda konuşma tanıma özelliği desteklenmiyor. Lütfen Google Chrome veya Microsoft Edge kullanın.');
+      setMicErrorMessage(common.micNotSupported);
       setMicPermissionDenied(true);
       return;
     }
@@ -295,7 +332,7 @@ export default function App() {
     // Explicitly request microphone permission
     const perm = await requestMicrophonePermission();
     if (!perm.ok) {
-      setMicErrorMessage(perm.error || 'Mikrofon erişim izni verilmedi.');
+      setMicErrorMessage(perm.error || common.micDenied);
       setMicPermissionDenied(true);
       return;
     }
@@ -363,7 +400,7 @@ export default function App() {
       activeId = 'chat_' + Date.now();
       const newSession: ChatSession = {
         id: activeId,
-        title: query.slice(0, 32) || (attachedFiles[0]?.name ? `${attachedFiles[0].name} Analizi` : 'Sohbet'),
+        title: query.slice(0, 32) || (attachedFiles[0]?.name ? `${attachedFiles[0].name} ${common.chatAnalysisTitle}` : common.newChatDefaultTitle),
         msgs: [],
         projId: currentProjectId,
         createdAt: Date.now(),
@@ -374,10 +411,18 @@ export default function App() {
       activeChat = newSession;
     }
 
+    const defaultInspectPrompt = lang === 'tr'
+      ? 'Ekli dosyayı detaylıca incele, içeriğini açıkla ve analiz et.'
+      : lang === 'de'
+      ? 'Bitte überprüfen Sie die angehängte Datei, erklären Sie den Inhalt und analysieren Sie ihn.'
+      : lang === 'es'
+      ? 'Por favor, inspecciona el archivo adjunto, explica su contenido y analízalo.'
+      : 'Please thoroughly inspect the attached file, explain its contents and analyze it.';
+
     const userMessage: ChatMessage = {
       id: 'usr_' + Date.now(),
       role: 'user',
-      content: query || (attachedFiles.length > 0 ? 'Ekli dosyayı detaylıca incele, içeriğini açıkla ve analiz et.' : ''),
+      content: query || (attachedFiles.length > 0 ? defaultInspectPrompt : ''),
       files: [...attachedFiles],
       timestamp: Date.now(),
     };
@@ -404,7 +449,7 @@ export default function App() {
     setStreamingBuffer('');
 
     if (sendingFiles.length > 0) {
-      setFileAnalysisStatus(`🔍 ${sendingFiles.map((f) => f.name).join(', ')} dosyası inceleniyor ve veriler taranıyor...`);
+      setFileAnalysisStatus(`🔍 ${sendingFiles.map((f) => f.name).join(', ')} — ${common.analyzingFile}`);
     } else {
       setFileAnalysisStatus(null);
     }
@@ -492,7 +537,7 @@ Rules:
       }
 
       if (sendingFiles.length > 0) {
-        setFileAnalysisStatus('⚡ MASTER AI dosya içeriğini analiz ediyor ve yanıt hazırlıyor...');
+        setFileAnalysisStatus(common.analyzingAi);
       }
 
       const reader = response.body?.getReader();
@@ -510,8 +555,11 @@ Rules:
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
+              let data: any = null;
               try {
-                const data = JSON.parse(line.slice(6));
+                data = JSON.parse(line.slice(6));
+              } catch {}
+              if (data) {
                 if (data.text) {
                   fullAssistantText += data.text;
                   setStreamingBuffer(fullAssistantText);
@@ -522,7 +570,7 @@ Rules:
                 if (data.error) {
                   throw new Error(data.error);
                 }
-              } catch {}
+              }
             }
           }
         }
@@ -532,7 +580,7 @@ Rules:
       const assistantMessage: ChatMessage = {
         id: 'ast_' + Date.now(),
         role: 'assistant',
-        content: fullAssistantText || 'Yanıt oluşturulamadı.',
+        content: fullAssistantText || common.noResponse,
         timestamp: Date.now(),
       };
 
@@ -561,10 +609,21 @@ Rules:
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.error('Chat API error:', err);
+        const isFetchError = err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError');
+        const userFriendlyMsg = isFetchError
+          ? (lang === 'tr'
+              ? 'Sunucu yanıtı zaman aşımına uğradı veya ağ bağlantısı kesildi. Lütfen tekrar gönderin.'
+              : lang === 'de'
+              ? 'Server-Zeitüberschreitung oder Netzwerk unterbrochen. Bitte versuchen Sie es erneut.'
+              : lang === 'es'
+              ? 'Se agotó el tiempo de espera del servidor o se interrumpió la red. Inténtalo de nuevo.'
+              : 'Server timed out or network was interrupted. Please try again.')
+          : err.message || 'API connection failed.';
+
         const errorMessage: ChatMessage = {
           id: 'err_' + Date.now(),
           role: 'assistant',
-          content: `⚠️ Bir hata oluştu: ${err.message || 'API bağlantısı kurulamadı.'}`,
+          content: `⚠️ ${common.errorNotice}: ${userFriendlyMsg}`,
           timestamp: Date.now(),
           isError: true,
         };
@@ -702,7 +761,7 @@ Rules:
           : p
       )
     );
-    setMascotBubble('Proje hafızasına kaydedildi! 📌');
+    setMascotBubble(common.pinnedToast);
     setTimeout(() => setMascotBubble(null), 3000);
   };
 
@@ -711,7 +770,7 @@ Rules:
     if (!currentChat || currentChat.msgs.length === 0) return;
     const text = `# ${currentChat.title}\n\n` +
       currentChat.msgs
-        .map((m) => `### ${m.role === 'user' ? 'Kullanıcı' : 'MASTER AI'}:\n${m.content}`)
+        .map((m) => `### ${m.role === 'user' ? (lang === 'tr' ? 'Kullanıcı' : 'User') : 'MASTER AI'}:\n${m.content}`)
         .join('\n\n---\n\n');
 
     const blob = new Blob([text], { type: 'text/markdown' });
@@ -750,10 +809,10 @@ Rules:
         if (Array.isArray(data.projects)) setProjects(data.projects);
         if (Array.isArray(data.plugins)) setPlugins(data.plugins);
         setIsPrivacyOpen(false);
-        setMascotBubble('Yedek başarıyla yüklendi! 💾');
+        setMascotBubble(common.backupLoaded);
         setTimeout(() => setMascotBubble(null), 3500);
       } catch {
-        alert('Geçersiz yedek dosyası!');
+        alert(common.invalidBackup);
       }
     };
     reader.readAsText(file);
@@ -814,6 +873,11 @@ Rules:
         onToggleEmojis={() =>
           setThemeSettings((prev) => ({ ...prev, allowEmojis: !prev.allowEmojis }))
         }
+        onOpenThreeStudio={() => setIsThreeStudioOpen(true)}
+        onOpenThreeGame={() => setIsThreeGameOpen(true)}
+        onOpenMusicStudio={() => setIsMusicStudioOpen(true)}
+        onOpenVideoStudio={() => setIsVideoStudioOpen(true)}
+        onOpenMaps={() => setIsMapsOpen(true)}
         onToggleTheme={() => {
           const next =
             themeSettings.themeMode === 'dark'
@@ -864,10 +928,10 @@ Rules:
                   ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 ring-1 ring-emerald-500/30'
                   : 'bg-[var(--in)] border-[var(--bd)] text-[var(--mu)] hover:text-[var(--tx)]'
               }`}
-              title={autoSpeakReplies ? 'Otomatik Sesli Yanıt: Açık' : 'Otomatik Sesli Yanıt: Kapalı'}
+              title={autoSpeakReplies ? common.autoVoiceOn : common.autoVoiceOff}
             >
               {autoSpeakReplies ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5" />}
-              <span className="hidden md:inline">{autoSpeakReplies ? 'Ses: Açık' : 'Ses: Kapalı'}</span>
+              <span className="hidden md:inline">{autoSpeakReplies ? common.voiceOn : common.voiceOff}</span>
             </button>
 
             {/* Quick Emoji On/Off Button */}
@@ -880,9 +944,49 @@ Rules:
                   ? 'bg-[var(--in)] border-[var(--bd)] text-emerald-400 hover:bg-[var(--hv)]'
                   : 'bg-red-950/40 border-red-500/40 text-red-300 ring-1 ring-red-500/30'
               }`}
-              title={themeSettings.allowEmojis ? 'Emojileri Kapat' : 'Emojileri Aç'}
+              title={common.toggleEmojis}
             >
-              {themeSettings.allowEmojis ? '🙂 EMOJİ: AÇIK' : '🚫 EMOJİ: KAPALI'}
+              {themeSettings.allowEmojis ? common.emojiOn : common.emojiOff}
+            </button>
+
+            {/* 3D Scene Studio Fast-Launch */}
+            <button
+              onClick={() => setIsThreeStudioOpen(true)}
+              className="p-2 rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:text-emerald-400 hover:bg-[var(--hv)] transition-colors hidden sm:flex items-center gap-1.5 text-xs font-semibold"
+              title="Three.js 3D Sahne Stüdyosu"
+            >
+              <Box className="w-4 h-4 text-emerald-400" />
+              <span className="hidden lg:inline">{lang === 'tr' ? '3D Stüdyo' : '3D Studio'}</span>
+            </button>
+
+            {/* 3D Game Fast-Launch */}
+            <button
+              onClick={() => setIsThreeGameOpen(true)}
+              className="p-2 rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:text-cyan-400 hover:bg-[var(--hv)] transition-colors hidden sm:flex items-center gap-1.5 text-xs font-semibold"
+              title="Three.js 3D Oyun (Cyber Hyperdrive)"
+            >
+              <Gamepad2 className="w-4 h-4 text-cyan-400" />
+              <span className="hidden lg:inline">{lang === 'tr' ? '3D Oyun' : '3D Game'}</span>
+            </button>
+
+            {/* Lyria Music Fast-Launch */}
+            <button
+              onClick={() => setIsMusicStudioOpen(true)}
+              className="p-2 rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:text-pink-400 hover:bg-[var(--hv)] transition-colors hidden md:flex items-center gap-1.5 text-xs font-semibold"
+              title="Lyria 3 Müzik Üretici"
+            >
+              <Music className="w-4 h-4 text-pink-400" />
+              <span className="hidden xl:inline">{lang === 'tr' ? 'Müzik' : 'Music'}</span>
+            </button>
+
+            {/* Omni Flash Video Fast-Launch */}
+            <button
+              onClick={() => setIsVideoStudioOpen(true)}
+              className="p-2 rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:text-blue-400 hover:bg-[var(--hv)] transition-colors hidden md:flex items-center gap-1.5 text-xs font-semibold"
+              title="Omni Flash 1.1 Video Üretici"
+            >
+              <Video className="w-4 h-4 text-blue-400" />
+              <span className="hidden xl:inline">{lang === 'tr' ? 'Video' : 'Video'}</span>
             </button>
 
             {/* Live Studio Toggle Button with Clear Exit State */}
@@ -893,13 +997,13 @@ Rules:
                   ? 'bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400/50 shadow-red-900/40'
                   : 'bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:bg-[var(--hv)]'
               }`}
-              title={isStudioOpen ? 'Stüdyodan Çık (Esc)' : 'Canlı Uygulama & Kod Stüdyosu'}
+              title={isStudioOpen ? common.exitStudioTooltip : common.liveStudioTooltip}
             >
               <Code2 className={`w-4 h-4 ${isStudioOpen ? 'text-white' : 'text-emerald-400'}`} />
               <span>
                 {isStudioOpen
-                  ? '✕ Stüdyodan Çık'
-                  : formatWithEmojiPreference('Canlı Stüdyo', themeSettings.allowEmojis)}
+                  ? common.exitStudioBtn
+                  : formatWithEmojiPreference(common.liveStudioBtn, themeSettings.allowEmojis)}
               </span>
             </button>
 
@@ -907,7 +1011,7 @@ Rules:
             <button
               onClick={handleExportChat}
               className="p-2 rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--mu)] hover:text-[var(--tx)] hover:bg-[var(--hv)] transition-colors"
-              title="Sohbeti Markdown olarak indir"
+              title={common.exportMarkdown}
             >
               <Download className="w-3.5 h-3.5" />
             </button>
@@ -939,8 +1043,51 @@ Rules:
                   {t.heroSubtitle}
                 </p>
 
+                {/* Quick Studio Feature Badges */}
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-xl">
+                  <button
+                    onClick={() => setIsThreeStudioOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  >
+                    <Box className="w-4 h-4 text-emerald-400" />
+                    <span>{lang === 'tr' ? '🌐 3D Sahne Stüdyosu' : '🌐 3D Scene Studio'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsThreeGameOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  >
+                    <Gamepad2 className="w-4 h-4 text-cyan-400" />
+                    <span>{lang === 'tr' ? '🎮 3D Aksiyon Oyunu' : '🎮 3D Action Game'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsMusicStudioOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  >
+                    <Music className="w-4 h-4 text-pink-400" />
+                    <span>{lang === 'tr' ? '🎵 Müzik (Lyria 3)' : '🎵 Music (Lyria 3)'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsVideoStudioOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  >
+                    <Video className="w-4 h-4 text-blue-400" />
+                    <span>{lang === 'tr' ? '🎬 Video (Omni Flash)' : '🎬 Video (Omni Flash)'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsMapsOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  >
+                    <MapPin className="w-4 h-4 text-teal-400" />
+                    <span>{lang === 'tr' ? '🗺️ Google Haritalar' : '🗺️ Google Maps'}</span>
+                  </button>
+                </div>
+
                 {/* Starter Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-8 w-full max-w-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-5 w-full max-w-xl">
                   {t.starterCards.map((card: any, idx: number) => (
                     <button
                       key={idx}
@@ -1001,10 +1148,10 @@ Rules:
                 <div className="max-w-[88%] md:max-w-[80%] rounded-2xl p-4 bg-[var(--gl)] text-[var(--tx)] border border-[var(--gb)] backdrop-blur-md shadow-sm">
                   <div className="flex items-center gap-2 mb-2 text-xs text-[var(--ac)] font-semibold">
                     <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                    <span>{fileAnalysisStatus || 'MASTER AI yanıt üretiyor…'}</span>
+                    <span>{fileAnalysisStatus || (lang === 'tr' ? 'MASTER AI yanıt üretiyor…' : 'MASTER AI is generating response…')}</span>
                   </div>
                   <div className="text-sm md:text-[15px] whitespace-pre-wrap leading-relaxed">
-                    {streamingBuffer || (fileAnalysisStatus ? 'Dosya içeriği taranıyor ve analiz ediliyor…' : 'Düşünülüyor…')}
+                    {streamingBuffer || (fileAnalysisStatus ? (lang === 'tr' ? 'Dosya içeriği taranıyor ve analiz ediliyor…' : 'Inspecting file data…') : (lang === 'tr' ? 'Düşünülüyor…' : 'Thinking…'))}
                   </div>
                 </div>
               </div>
@@ -1035,7 +1182,7 @@ Rules:
               <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs anim-pop">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>{micErrorMessage || 'Sesle konuşabilmek için mikrofon izni gereklidir. Lütfen tarayıcınızın adres çubuğundaki kilit simgesinden mikrofon erişimine izin verin.'}</span>
+                  <span>{micErrorMessage || common.micDenied}</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 ml-2">
                   <button
@@ -1043,7 +1190,7 @@ Rules:
                     onClick={handleToggleMic}
                     className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold transition-colors"
                   >
-                    Tekrar Dene
+                    {lang === 'tr' ? 'Tekrar Dene' : 'Try Again'}
                   </button>
                   <button
                     type="button"
@@ -1061,7 +1208,7 @@ Rules:
               <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs anim-pop">
                 <div className="flex items-center gap-2.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="font-semibold">🎙️ Dinleniyor... Konuşun (sesiniz metne dökülüyor)</span>
+                  <span className="font-semibold">{common.listeningActive}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1075,13 +1222,13 @@ Rules:
                     className="px-2.5 py-1 rounded-lg bg-emerald-500 text-black font-bold text-[11px] hover:bg-emerald-400 transition-colors flex items-center gap-1"
                   >
                     <Send className="w-3 h-3" />
-                    <span>Gönder</span>
+                    <span>{common.send}</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleStopMic}
                     className="p-1 text-emerald-400/80 hover:text-white"
-                    title="Dinlemeyi Durdur"
+                    title={common.stopListening}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1139,6 +1286,57 @@ Rules:
                 )}
               </div>
 
+              {/* Quick AI Tool Triggers */}
+              <button
+                type="button"
+                onClick={() => setIsThreeStudioOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:border-emerald-500 hover:text-emerald-400 transition-colors"
+                title="Three.js 3D Sahne Stüdyosu"
+              >
+                <Box className="w-3 h-3 text-emerald-400" />
+                <span>3D</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsThreeGameOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:border-cyan-500 hover:text-cyan-400 transition-colors"
+                title="Three.js 3D Cyber Oyun"
+              >
+                <Gamepad2 className="w-3 h-3 text-cyan-400" />
+                <span>{lang === 'tr' ? 'Oyun' : 'Game'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMusicStudioOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:border-pink-500 hover:text-pink-400 transition-colors"
+                title="Lyria 3 Müzik Üretici"
+              >
+                <Music className="w-3 h-3 text-pink-400" />
+                <span>{lang === 'tr' ? 'Müzik' : 'Music'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsVideoStudioOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:border-blue-500 hover:text-blue-400 transition-colors"
+                title="Omni Flash Video Üretici"
+              >
+                <Video className="w-3 h-3 text-blue-400" />
+                <span>Video</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMapsOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] hover:border-teal-500 hover:text-teal-400 transition-colors"
+                title="Google Maps Konum & Yer Rehberi"
+              >
+                <MapPin className="w-3 h-3 text-teal-400" />
+                <span>Maps</span>
+              </button>
+
               {/* Attached files previews */}
               {attachedFiles.map((file, i) => (
                 <div
@@ -1180,7 +1378,7 @@ Rules:
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="p-2 text-[var(--mu)] hover:text-[var(--tx)] hover:bg-[var(--hv)] rounded-xl transition-colors shrink-0"
-                title="Dosya veya Görsel Ekle (analiz için)"
+                title={common.attachFile}
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -1204,7 +1402,7 @@ Rules:
                   }
                 }}
                 rows={1}
-                placeholder={isMicListening ? 'Konuşmanız algılanıyor…' : t.inputPlaceholder}
+                placeholder={isMicListening ? common.listeningPlaceholder : t.inputPlaceholder}
                 className="flex-1 bg-transparent border-0 outline-none resize-none text-xs md:text-sm py-2 px-1 text-[var(--tx)] placeholder-[var(--mu)] max-h-36 overflow-y-auto leading-relaxed"
               />
 
@@ -1217,7 +1415,7 @@ Rules:
                     ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30'
                     : 'text-[var(--mu)] hover:text-emerald-400 hover:bg-[var(--hv)]'
                 }`}
-                title={isMicListening ? 'Dinlemeyi Durdur' : 'Sesle Konuş / Yazdır'}
+                title={isMicListening ? common.stopListening : common.voiceInput}
               >
                 {isMicListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
               </button>
@@ -1227,7 +1425,7 @@ Rules:
                 type="button"
                 onClick={() => setIsVoiceOpen(true)}
                 className="p-2 text-[var(--mu)] hover:text-[var(--ac)] hover:bg-[var(--hv)] rounded-xl transition-colors shrink-0"
-                title="Canlı Karşılıklı Sesli Sohbet"
+                title={common.liveVoice}
               >
                 <Headphones className="w-5 h-5" />
               </button>
@@ -1238,7 +1436,7 @@ Rules:
                   type="button"
                   onClick={handleStopStreaming}
                   className="p-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white shadow transition-all shrink-0"
-                  title="Durdur"
+                  title={common.stop}
                 >
                   <Square className="w-4 h-4 fill-white" />
                 </button>
@@ -1247,9 +1445,9 @@ Rules:
                   type="submit"
                   disabled={!inputText.trim() && attachedFiles.length === 0}
                   className="p-2.5 rounded-xl bg-[var(--acg)] text-white shadow disabled:opacity-40 hover:opacity-90 transition-all shrink-0"
-                  title="Gönder"
+                  title={common.send}
                 >
-                  <ArrowUp className="w-4 h-4" />
+                  <Send className="w-4 h-4" />
                 </button>
               )}
             </form>
@@ -1290,6 +1488,7 @@ Rules:
         settings={themeSettings}
         onUpdateSettings={setThemeSettings}
         onResetSettings={() => setThemeSettings(DEFAULT_THEME_SETTINGS)}
+        lang={lang}
       />
 
       <PluginsModal
@@ -1345,6 +1544,7 @@ Rules:
             setCurrentProjectId(projects[0]?.id);
           }
         }}
+        lang={lang}
       />
 
       <PrivacyModal
@@ -1352,6 +1552,43 @@ Rules:
         onClose={() => setIsPrivacyOpen(false)}
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
+        lang={lang}
+      />
+
+      {/* Three.js 3D Procedural Scene Studio */}
+      <ThreeStudio
+        isOpen={isThreeStudioOpen}
+        onClose={() => setIsThreeStudioOpen(false)}
+        lang={lang}
+      />
+
+      {/* Three.js 3D Interactive Action Game */}
+      <ThreeGame
+        isOpen={isThreeGameOpen}
+        onClose={() => setIsThreeGameOpen(false)}
+        lang={lang}
+      />
+
+      {/* Lyria 3 Music Generation Studio */}
+      <MusicStudioModal
+        isOpen={isMusicStudioOpen}
+        onClose={() => setIsMusicStudioOpen(false)}
+        lang={lang}
+      />
+
+      {/* Gemini Omni Flash 1.1 Video Studio */}
+      <VideoStudioModal
+        isOpen={isVideoStudioOpen}
+        onClose={() => setIsVideoStudioOpen(false)}
+        lang={lang}
+      />
+
+      {/* Google Maps Grounding & Place Finder */}
+      <MapsModal
+        isOpen={isMapsOpen}
+        onClose={() => setIsMapsOpen(false)}
+        lang={lang}
+        onSendToChat={(text) => handleSendMessage(text)}
       />
     </div>
   );

@@ -161,7 +161,7 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
       <div
         onClick={onClose}
         className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
-        title="Kapatmak için dışarıya tıklayın (Esc)"
+        title={`${t.close} (Esc)`}
       />
 
       <section
@@ -343,7 +343,7 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
                   onClick={() => setErrors([])}
                   className="text-[10px] text-[var(--mu)] hover:text-[var(--tx)] underline"
                 >
-                  Temizle
+                  {t.clearErrors || 'Clear'}
                 </button>
               </div>
               {errors.map((err, i) => (

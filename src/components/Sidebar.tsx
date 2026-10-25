@@ -15,6 +15,11 @@ import {
   ChevronLeft,
   Smile,
   Ban,
+  Box,
+  Gamepad2,
+  Music,
+  Video,
+  MapPin,
 } from 'lucide-react';
 import { ChatSession, Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
@@ -38,6 +43,11 @@ interface SidebarProps {
   onToggleTheme: () => void;
   allowEmojis?: boolean;
   onToggleEmojis?: () => void;
+  onOpenThreeStudio?: () => void;
+  onOpenThreeGame?: () => void;
+  onOpenMusicStudio?: () => void;
+  onOpenVideoStudio?: () => void;
+  onOpenMaps?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -58,8 +68,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleTheme,
   allowEmojis = true,
   onToggleEmojis,
+  onOpenThreeStudio,
+  onOpenThreeGame,
+  onOpenMusicStudio,
+  onOpenVideoStudio,
+  onOpenMaps,
 }) => {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const common = t.common || TRANSLATIONS.en.common;
   const [searchQuery, setSearchQuery] = useState('');
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -145,26 +161,82 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="space-y-1.5 my-3">
+        <div className="space-y-1.5 my-2">
           <button
             onClick={onNewChat}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[var(--acg)] text-white text-xs font-semibold shadow hover:opacity-95 transition-all"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-[var(--acg)] text-white text-xs font-semibold shadow hover:opacity-95 transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>{formatWithEmojiPreference(t.newChat, allowEmojis)}</span>
           </button>
 
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
+          {/* AI Creative Suite Quick Launches */}
+          <div className="p-2 rounded-xl bg-[var(--in)] border border-[var(--bd)] space-y-1.5">
+            <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--mu)] block px-1">
+              {lang === 'tr' ? 'Yapay Zeka Stüdyosu' : 'AI Creative Suite'}
+            </span>
+            <div className="grid grid-cols-2 gap-1 text-[11px]">
+              <button
+                onClick={onOpenThreeStudio}
+                className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-[var(--hv)] text-[var(--tx)] transition-colors text-left font-medium"
+                title="Three.js 3D Sahne Stüdyosu"
+              >
+                <Box className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate">{lang === 'tr' ? '3D Stüdyo' : '3D Studio'}</span>
+              </button>
+
+              <button
+                onClick={onOpenThreeGame}
+                className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-[var(--hv)] text-[var(--tx)] transition-colors text-left font-medium"
+                title="Three.js 3D Oyun"
+              >
+                <Gamepad2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="truncate">{lang === 'tr' ? '3D Oyun' : '3D Game'}</span>
+              </button>
+
+              <button
+                onClick={onOpenMusicStudio}
+                className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-[var(--hv)] text-[var(--tx)] transition-colors text-left font-medium"
+                title="Lyria 3 Müzik Üretici"
+              >
+                <Music className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                <span className="truncate">{lang === 'tr' ? 'Müzik (Lyria)' : 'Music (Lyria)'}</span>
+              </button>
+
+              <button
+                onClick={onOpenVideoStudio}
+                className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-[var(--hv)] text-[var(--tx)] transition-colors text-left font-medium"
+                title="Omni Flash 1.1 Video Üretici"
+              >
+                <Video className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="truncate">{lang === 'tr' ? 'Video (Omni)' : 'Video (Omni)'}</span>
+              </button>
+            </div>
+
+            <button
+              onClick={onOpenMaps}
+              className="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-[var(--hv)] text-[var(--tx)] transition-colors text-left font-medium text-[11px]"
+              title="Google Maps Konum & Yer Arama"
+            >
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span>{lang === 'tr' ? 'Google Haritalar' : 'Google Maps'}</span>
+              </div>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-teal-500/20 text-teal-300 font-mono">MAPS</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
             <button
               onClick={onOpenPlugins}
-              className="flex items-center gap-1.5 py-2 px-2.5 rounded-lg bg-[var(--in)] hover:bg-[var(--hv)] text-xs text-[var(--tx)] border border-[var(--bd)] transition-colors"
+              className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-[var(--in)] hover:bg-[var(--hv)] text-xs text-[var(--tx)] border border-[var(--bd)] transition-colors"
             >
               <Puzzle className="w-3.5 h-3.5 text-[var(--ac)]" />
               <span className="truncate">{formatWithEmojiPreference(t.plugins, allowEmojis)}</span>
             </button>
             <button
               onClick={onOpenProjects}
-              className="flex items-center gap-1.5 py-2 px-2.5 rounded-lg bg-[var(--in)] hover:bg-[var(--hv)] text-xs text-[var(--tx)] border border-[var(--bd)] transition-colors"
+              className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-[var(--in)] hover:bg-[var(--hv)] text-xs text-[var(--tx)] border border-[var(--bd)] transition-colors"
             >
               <FolderKanban className="w-3.5 h-3.5 text-[var(--ac2)]" />
               <span className="truncate">{formatWithEmojiPreference(t.projects, allowEmojis)}</span>
@@ -193,7 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   type="button"
                   onClick={clearSearch}
                   className="p-0.5 rounded text-[var(--mu)] hover:text-[var(--tx)] hover:bg-[var(--hv)] transition-colors"
-                  title="Temizle"
+                  title={common.clear}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -210,22 +282,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto space-y-1 py-1 pr-1">
           {chats.length === 0 ? (
             <div className="text-center py-8 text-xs text-[var(--mu)] space-y-2">
-              <p>Henüz sohbet yok</p>
+              <p>{common.noChats}</p>
               <button
                 onClick={onNewChat}
                 className="inline-flex items-center gap-1 text-[11px] text-[var(--ac)] hover:underline"
               >
-                <Plus className="w-3 h-3" /> Yeni sohbet başlat
+                <Plus className="w-3 h-3" /> {common.startNewChat}
               </button>
             </div>
           ) : filteredChats.length === 0 ? (
             <div className="text-center py-8 px-2 text-xs text-[var(--mu)] space-y-2">
-              <p>"{searchQuery}" ile eşleşen sohbet bulunamadı</p>
+              <p>"{searchQuery}" - {common.noMatchingChats}</p>
               <button
                 onClick={clearSearch}
                 className="inline-flex items-center gap-1 text-[11px] text-[var(--ac)] font-medium px-2.5 py-1 rounded-lg bg-[var(--ac)]/10 hover:bg-[var(--ac)]/20 transition-colors"
               >
-                <X className="w-3 h-3" /> Aramayı Temizle
+                <X className="w-3 h-3" /> {common.clearSearch}
               </button>
             </div>
           ) : (
@@ -286,7 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           startRename(c.id, c.title);
                         }}
                         className="p-1 text-[var(--mu)] hover:text-[var(--tx)]"
-                        title="Yeniden adlandır"
+                        title={common.rename}
                       >
                         <Edit2 className="w-3 h-3" />
                       </button>
@@ -296,7 +368,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onDeleteChat(c.id);
                         }}
                         className="p-1 text-[var(--mu)] hover:text-red-400"
-                        title="Sil"
+                        title={common.delete}
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -351,7 +423,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ? 'bg-[var(--in)] text-emerald-400 hover:bg-[var(--hv)]'
                   : 'bg-red-950/40 text-red-400 border-red-500/30'
               }`}
-              title={allowEmojis ? 'Emojileri Kapat' : 'Emojileri Aç'}
+              title={common.toggleEmojis}
             >
               {allowEmojis ? <Smile className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
             </button>

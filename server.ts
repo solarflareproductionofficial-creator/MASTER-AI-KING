@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
@@ -11,7 +11,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Enable CORS and preflight handling
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Initialize GoogleGenAI SDK according to official guidelines
 const ai = new GoogleGenAI({
@@ -23,13 +35,46 @@ const ai = new GoogleGenAI({
   },
 });
 
-const PRIMARY_MODEL = 'gemini-3.8-flash';
-const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+// Use ultra-fast gemini-3.1-flash-lite as primary to avoid 503 high-demand delays
+const PRIMARY_MODEL = 'gemini-3.1-flash-lite';
+const FALLBACK_MODEL = 'gemini-3.8-flash';
 
-// Helper to execute stream with automatic resilient model fallback
-async function getResilientStream(contents: any, systemInstruction?: string, temperature = 0.7) {
+// Helper generator to stream with automatic model fallback and unary safety net
+async function* streamWithFallback(contents: any, systemInstruction?: string, temperature = 0.7) {
+  const models = [PRIMARY_MODEL, FALLBACK_MODEL];
+  let lastError: any = null;
+
+  for (const model of models) {
+    try {
+      const responseStream = await ai.models.generateContentStream({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+          temperature,
+        },
+      });
+
+      let hasYielded = false;
+      for await (const chunk of responseStream) {
+        if (chunk.text) {
+          hasYielded = true;
+          yield chunk.text;
+        }
+      }
+
+      if (hasYielded) {
+        return;
+      }
+    } catch (err: any) {
+      console.warn(`Model ${model} stream failed (${err?.status || err?.message || 'unknown error'}), trying next option...`);
+      lastError = err;
+    }
+  }
+
+  // Unary fallback if streaming encountered issues
   try {
-    return await ai.models.generateContentStream({
+    const unaryRes = await ai.models.generateContent({
       model: PRIMARY_MODEL,
       contents,
       config: {
@@ -37,16 +82,12 @@ async function getResilientStream(contents: any, systemInstruction?: string, tem
         temperature,
       },
     });
-  } catch (err: any) {
-    console.warn(`Primary model ${PRIMARY_MODEL} returned error (${err?.status || err?.message}), falling back to ${FALLBACK_MODEL}`);
-    return await ai.models.generateContentStream({
-      model: FALLBACK_MODEL,
-      contents,
-      config: {
-        systemInstruction,
-        temperature,
-      },
-    });
+    if (unaryRes.text) {
+      yield unaryRes.text;
+      return;
+    }
+  } catch (unaryErr) {
+    throw lastError || unaryErr;
   }
 }
 
@@ -70,10 +111,11 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     return;
   }
 
-  // Set SSE Headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  // Set SSE Headers with anti-buffering
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
   try {
@@ -93,10 +135,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       systemInstruction ||
       'You are MASTER AI, a versatile, intelligent, helpful and safe universal AI assistant. You help users with everything in daily life: daily planning, answering questions, writing, learning, problem solving, analysis, research, and complete working code (HTML/JS/Canvas, Python, TypeScript, etc.). Always reply in the user\'s language accurately and concisely.';
 
-    const responseStream = await getResilientStream(contents, defaultSys, temperature);
-
-    for await (const chunk of responseStream) {
-      const text = chunk.text;
+    for await (const text of streamWithFallback(contents, defaultSys, temperature)) {
       if (text) {
         res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
@@ -183,15 +222,15 @@ app.post('/api/deep-research', async (req: Request, res: Response) => {
 
     res.write(`data: ${JSON.stringify({ step: 'synthesizing', progress: 85, message: 'Synthesizing final executive game development report...' })}\n\n`);
 
-    const synthesisStream = await getResilientStream(
+    const synthesisStream = streamWithFallback(
       `Topic: ${topic}\n\nResearch Findings:\n${findings.join('\n\n')}\n\nSynthesize this into a master game development dossier. Include: Executive Summary, Architecture Breakdown, Step-by-Step Implementation Plan, Code Snippets/Math Formulas, Potential Pitfalls, and Final Verdict. Write in the same language as the topic query.`,
       systemInstruction || 'You are MASTER AI, creating elite game development technical reports.',
       0.6
     );
 
-    for await (const chunk of synthesisStream) {
-      if (chunk.text) {
-        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+    for await (const text of synthesisStream) {
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
     }
 
@@ -228,16 +267,15 @@ CRITICAL RULES:
 2. Ensure canvas/DOM elements, styles, scripts and logic are intact.
 3. Add a brief 2-sentence summary of the fixes applied.`;
 
-    const responseStream = await getResilientStream(prompt, 'You are an elite game code debugger and engine architect.', 0.4);
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
-    for await (const chunk of responseStream) {
-      if (chunk.text) {
-        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+    for await (const text of streamWithFallback(prompt, 'You are an elite game code debugger and engine architect.', 0.4)) {
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
     }
 
@@ -246,6 +284,264 @@ CRITICAL RULES:
   } catch (error: any) {
     console.error('Fix game error:', error);
     res.status(500).json({ error: error?.message || 'Fix game request failed' });
+  }
+});
+
+// Lyria Music Generation Endpoint (lyria-3-clip-preview and lyria-3-pro-preview)
+app.post('/api/music/generate', async (req: Request, res: Response) => {
+  const { prompt, model = 'lyria-3-clip-preview', imageBase64, mimeType = 'image/jpeg' } = req.body;
+  if (!prompt || typeof prompt !== 'string') {
+    res.status(400).json({ error: 'Music prompt is required' });
+    return;
+  }
+
+  try {
+    const targetModel = model === 'lyria-3-pro-preview' ? 'lyria-3-pro-preview' : 'lyria-3-clip-preview';
+
+    let contents: any;
+    if (imageBase64) {
+      contents = {
+        parts: [
+          { text: prompt },
+          { inlineData: { data: imageBase64, mimeType } },
+        ],
+      };
+    } else {
+      contents = prompt;
+    }
+
+    const responseStream = await ai.models.generateContentStream({
+      model: targetModel,
+      contents,
+      config: {
+        responseModalities: [Modality.AUDIO],
+      },
+    });
+
+    let audioBase64 = '';
+    let lyrics = '';
+    let audioMimeType = 'audio/wav';
+
+    for await (const chunk of responseStream) {
+      const parts = chunk.candidates?.[0]?.content?.parts;
+      if (!parts) continue;
+
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          if (!audioBase64 && part.inlineData.mimeType) {
+            audioMimeType = part.inlineData.mimeType;
+          }
+          audioBase64 += part.inlineData.data;
+        }
+        if (part.text && !lyrics) {
+          lyrics = part.text;
+        }
+      }
+    }
+
+    if (!audioBase64) {
+      throw new Error('No audio data received from Lyria model.');
+    }
+
+    res.json({
+      success: true,
+      audio: audioBase64,
+      mimeType: audioMimeType,
+      lyrics,
+      model: targetModel,
+    });
+  } catch (error: any) {
+    console.error('Lyria music error:', error);
+    res.status(500).json({
+      error: error?.message || 'Music generation failed. Lyria requires a paid API key or billing-enabled project.',
+    });
+  }
+});
+
+// Omni Flash Video Generation Endpoint (gemini-omni-1.1-flash)
+app.post('/api/video/generate', async (req: Request, res: Response) => {
+  const { prompt, aspectRatio = '16:9', duration = '5s', resolution = '720p', imageBase64, mimeType = 'image/png' } = req.body;
+  if (!prompt || typeof prompt !== 'string') {
+    res.status(400).json({ error: 'Video prompt is required' });
+    return;
+  }
+
+  try {
+    let input: any;
+    if (imageBase64) {
+      input = [
+        {
+          type: 'image',
+          mime_type: mimeType,
+          data: imageBase64,
+        },
+        {
+          type: 'text',
+          text: prompt,
+        },
+      ];
+    } else {
+      input = prompt;
+    }
+
+    const interaction = await ai.interactions.create(
+      {
+        model: 'gemini-omni-1.1-flash',
+        input,
+        background: false,
+        store: false,
+        stream: false,
+        response_format: {
+          type: 'video',
+          aspect_ratio: aspectRatio as '16:9' | '9:16',
+          duration: duration as '5s' | '10s',
+          resolution: resolution as '720p' | '360p' | '1080p',
+        },
+      },
+      { timeout: 300000 }
+    );
+
+    const videoPart = interaction.output_video;
+    if (videoPart && videoPart.data) {
+      res.json({
+        success: true,
+        video: videoPart.data,
+        mimeType: videoPart.mime_type || 'video/mp4',
+        aspectRatio,
+        duration,
+      });
+      return;
+    }
+
+    throw new Error('Video generation completed without video data.');
+  } catch (error: any) {
+    console.error('Omni Flash video error:', error);
+    res.status(500).json({
+      error: error?.message || 'Video generation failed. Gemini Omni Flash requires a paid API key or quota.',
+    });
+  }
+});
+
+// Google Maps Grounding Endpoint (gemini-3.8-flash with google_maps tool)
+app.post('/api/maps/search', async (req: Request, res: Response) => {
+  const { query, location } = req.body;
+  if (!query || typeof query !== 'string') {
+    res.status(400).json({ error: 'Query is required' });
+    return;
+  }
+
+  try {
+    const inputPrompt = location ? `${query} (User location: ${location})` : query;
+    const interaction = await ai.interactions.create({
+      model: 'gemini-3.8-flash',
+      input: inputPrompt,
+      tools: [{ type: 'google_maps' }],
+    });
+
+    let textOutput = interaction.output_text || '';
+    if (!textOutput) {
+      for (const step of interaction.steps || []) {
+        if (step.type === 'model_output') {
+          const tc: any = step.content?.find((c: any) => c.type === 'text');
+          if (tc && typeof tc.text === 'string') textOutput += tc.text;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      text: textOutput,
+      steps: interaction.steps,
+    });
+  } catch (error: any) {
+    console.warn('Maps grounding interaction notice, falling back:', error?.message);
+    try {
+      const fallbackRes = await ai.models.generateContent({
+        model: PRIMARY_MODEL,
+        contents: `Provide detailed geographical, mapping and local places guidance for: "${query}". Include coordinates, recommended places, addresses, directions, and nearby amenities if relevant. Formatted clearly with Markdown.`,
+      });
+      res.json({
+        success: true,
+        text: fallbackRes.text || 'Location search completed.',
+        fallback: true,
+      });
+    } catch (fbErr: any) {
+      res.status(500).json({ error: error?.message || 'Maps search request failed.' });
+    }
+  }
+});
+
+// Live Voice Turn Endpoint (gemini-3.8-live / fast TTS)
+app.post('/api/voice/turn', async (req: Request, res: Response) => {
+  const { text, lang = 'tr' } = req.body;
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ error: 'Text prompt is required' });
+    return;
+  }
+
+  try {
+    const sysPrompt =
+      lang === 'tr'
+        ? 'Sen MASTER AI canlı sesli asistanısın. Kısa, doğal, sıcak ve doğrudan 1-3 cümlelik konuşma diliyle yanıt ver. Samimi ve enerjik ol.'
+        : 'You are MASTER AI live voice assistant. Reply in concise, natural, warm 1-3 sentences suitable for direct speech audio.';
+
+    const genRes = await ai.models.generateContent({
+      model: PRIMARY_MODEL,
+      contents: text,
+      config: {
+        systemInstruction: sysPrompt,
+        temperature: 0.7,
+      },
+    });
+
+    const replyText =
+      genRes.text ||
+      (lang === 'tr' ? 'Sizi dinliyorum, nasıl yardımcı olabilirim?' : 'I am listening, how can I help?');
+
+    let audioBase64: string | null = null;
+    try {
+      const ttsInteraction = await ai.interactions.create({
+        model: 'gemini-3.8-flash-lite-tts',
+        input: [
+          {
+            type: 'text',
+            text: replyText,
+            annotations: [
+              {
+                type: 'speech_metadata',
+                style: 'Natural, friendly conversational AI assistant',
+              },
+            ],
+          },
+        ],
+        response_format: { type: 'audio' },
+        generation_config: {
+          speech_config: [
+            {
+              language: lang === 'tr' ? 'tr-TR' : 'en-US',
+              voice: 'Kore',
+            },
+          ],
+        },
+      });
+
+      const audioPart = ttsInteraction.output_audio;
+      if (audioPart?.data) {
+        audioBase64 = audioPart.data;
+      }
+    } catch (ttsErr) {
+      console.warn('Voice TTS fallback notice:', ttsErr);
+    }
+
+    res.json({
+      success: true,
+      text: replyText,
+      audio: audioBase64,
+      mimeType: 'audio/wav',
+    });
+  } catch (error: any) {
+    console.error('Voice turn error:', error);
+    res.status(500).json({ error: error?.message || 'Voice request failed' });
   }
 });
 

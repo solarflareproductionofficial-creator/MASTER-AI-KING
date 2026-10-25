@@ -40,14 +40,14 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
       const perm = await requestMicrophonePermission();
       if (!active) return;
       if (!perm.ok) {
-        setPermError(perm.error || 'Mikrofon izni verilmedi.');
+        setPermError(perm.error || (TRANSLATIONS[lang] || TRANSLATIONS.en).common.micDenied);
         return;
       }
       setPermError(null);
 
       const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRec) {
-        setPermError('Tarayıcınız sesli konuşma tanımayı desteklemiyor.');
+        setPermError(t.notSupported);
         return;
       }
 
@@ -205,15 +205,15 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
         <div className="mt-8">
           <h3 className="text-lg md:text-xl font-bold brand-font text-white mb-2">
             {isAiBusy
-              ? '⚡ MASTER AI Düşünüyor…'
+              ? t.aiThinking
               : isMuted
-              ? 'Mikrofon Kapalı'
+              ? t.micMuted
               : transcript
               ? `"${transcript}"`
-              : '🎙️ Dinleniyor… Konuşabilirsiniz'}
+              : t.micActive}
           </h3>
           <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-            Günlük hayat, iş, planlama, araştırma veya kod hakkında her şeyi sorabilirsiniz.
+            {t.voiceSubtitle}
           </p>
         </div>
       </div>
