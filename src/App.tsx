@@ -5,6 +5,7 @@ import {
   Gamepad2,
   Download,
   Mic,
+  MicOff,
   Headphones,
   ArrowUp,
   Square,
@@ -14,6 +15,16 @@ import {
   ChevronDown,
   Layers,
   Code2,
+  Volume2,
+  VolumeX,
+  FileCode,
+  FileText,
+  FileImage,
+  AlertCircle,
+  X,
+  RefreshCw,
+  Send,
+  Radio,
 } from 'lucide-react';
 
 import {
@@ -43,10 +54,16 @@ import {
 
 import { detectUserLanguage } from './utils/langDetect';
 import { formatWithEmojiPreference } from './utils/emoji';
+import {
+  requestMicrophonePermission,
+  isSpeechRecognitionSupported,
+  createSpeechRecognizer,
+  speakText,
+} from './utils/speech';
 
 const DEFAULT_THEME_SETTINGS: ThemeSettings = {
-  accentColor: '#10e0a8',
-  gradientColors: ['#10e0a8', '#8f74ff'],
+  accentColor: '#10a37f',
+  gradientColors: ['#10a37f', '#059669'],
   gradientAngle: 135,
   animatedGradient: false,
   themeMode: 'dark',
@@ -54,8 +71,8 @@ const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   chatWidth: 760,
   bubbleStyle: 'soft',
   animations: 'normal',
-  showMascot: true,
-  bgOrbs: true,
+  showMascot: false, // Sade ve saf - minimalist by default, no cartoon mascot clutter
+  bgOrbs: false,      // Sade ve saf - clean modern workspace without distracting background orbs
   allowEmojis: true,
   emojiDensity: 'normal',
 };
@@ -131,6 +148,12 @@ export default function App() {
 
   // Voice State
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [isMicListening, setIsMicListening] = useState(false);
+  const [micPermissionDenied, setMicPermissionDenied] = useState(false);
+  const [micErrorMessage, setMicErrorMessage] = useState<string | null>(null);
+  const [autoSpeakReplies, setAutoSpeakReplies] = useState(false);
+  const [fileAnalysisStatus, setFileAnalysisStatus] = useState<string | null>(null);
+  const speechRecognizerRef = useRef<any>(null);
 
   // Modals
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
@@ -251,8 +274,84 @@ export default function App() {
     );
   };
 
+  // Voice Mic Dictation with Permission Handling
+  const handleToggleMic = async () => {
+    if (isMicListening) {
+      if (speechRecognizerRef.current) {
+        try {
+          speechRecognizerRef.current.stop();
+        } catch {}
+      }
+      setIsMicListening(false);
+      return;
+    }
+
+    if (!isSpeechRecognitionSupported()) {
+      setMicErrorMessage('Tarayıcınızda konuşma tanıma özelliği desteklenmiyor. Lütfen Google Chrome veya Microsoft Edge kullanın.');
+      setMicPermissionDenied(true);
+      return;
+    }
+
+    // Explicitly request microphone permission
+    const perm = await requestMicrophonePermission();
+    if (!perm.ok) {
+      setMicErrorMessage(perm.error || 'Mikrofon erişim izni verilmedi.');
+      setMicPermissionDenied(true);
+      return;
+    }
+
+    setMicPermissionDenied(false);
+    setMicErrorMessage(null);
+
+    // Initialize recognizer
+    const recognizer = createSpeechRecognizer(
+      lang,
+      (transcript, _isFinal) => {
+        if (transcript && transcript.trim()) {
+          setInputText((prev) => {
+            const trimmed = prev.trim();
+            if (!trimmed) return transcript;
+            return trimmed + ' ' + transcript;
+          });
+        }
+      },
+      (err) => {
+        console.warn('Speech error:', err);
+        setIsMicListening(false);
+      },
+      () => {
+        setIsMicListening(false);
+      }
+    );
+
+    if (recognizer) {
+      speechRecognizerRef.current = recognizer;
+      try {
+        recognizer.start();
+        setIsMicListening(true);
+      } catch (e) {
+        console.error('Recognizer start error:', e);
+        setIsMicListening(false);
+      }
+    }
+  };
+
+  const handleStopMic = () => {
+    if (speechRecognizerRef.current) {
+      try {
+        speechRecognizerRef.current.stop();
+      } catch {}
+    }
+    setIsMicListening(false);
+  };
+
   // Send Prompt to Gemini Backend
   const handleSendMessage = async (textToSend?: string) => {
+    // If mic was listening, stop it
+    if (isMicListening) {
+      handleStopMic();
+    }
+
     const query = (textToSend || inputText).trim();
     if ((!query && attachedFiles.length === 0) || isStreaming) return;
 
@@ -264,7 +363,7 @@ export default function App() {
       activeId = 'chat_' + Date.now();
       const newSession: ChatSession = {
         id: activeId,
-        title: query.slice(0, 32) || 'Oyun Sohbeti',
+        title: query.slice(0, 32) || (attachedFiles[0]?.name ? `${attachedFiles[0].name} Analizi` : 'Sohbet'),
         msgs: [],
         projId: currentProjectId,
         createdAt: Date.now(),
@@ -278,7 +377,7 @@ export default function App() {
     const userMessage: ChatMessage = {
       id: 'usr_' + Date.now(),
       role: 'user',
-      content: query || 'Ekli dosyaları incele ve oyun geliştirmede bana yardımcı ol.',
+      content: query || (attachedFiles.length > 0 ? 'Ekli dosyayı detaylıca incele, içeriğini açıkla ve analiz et.' : ''),
       files: [...attachedFiles],
       timestamp: Date.now(),
     };
@@ -297,11 +396,18 @@ export default function App() {
       )
     );
 
+    const sendingFiles = [...attachedFiles];
     // Reset input
     setInputText('');
     setAttachedFiles([]);
     setIsStreaming(true);
     setStreamingBuffer('');
+
+    if (sendingFiles.length > 0) {
+      setFileAnalysisStatus(`🔍 ${sendingFiles.map((f) => f.name).join(', ')} dosyası inceleniyor ve veriler taranıyor...`);
+    } else {
+      setFileAnalysisStatus(null);
+    }
 
     // Prepare system instructions with plugins and project memory
     const activeProject = projects.find((p) => p.id === currentProjectId);
@@ -313,6 +419,7 @@ You assist users with EVERYTHING in daily life:
 - Daily planning, productivity, work tasks, education, science, math, habits and practical advice.
 - Creative and professional writing, essays, emails, resumes, language learning, translation, and storytelling.
 - Technology, debugging, architecture, algorithms, and full working code (HTML/JS/Canvas, Python, TypeScript, etc.).
+- File analysis: When files, documents, or images are attached, thoroughly read and inspect their contents. Explain what they contain, summarize key structures or themes, identify any potential bugs or insights, and answer user questions in detail.
 - When the user asks for interactive tools, widgets, visual simulations, or games, write a complete self-contained file in ONE \`\`\`html block so the user can test and run it directly in Live Studio.
 
 Always reply naturally, helpfully, and accurately in the user's language (prefer Turkish if query is Turkish).
@@ -337,19 +444,31 @@ Rules:
     : ''
 }`;
 
-    // Prepare conversational history
+    // Prepare conversational history with multimodal parts
     const history = (activeChat?.msgs || []).concat(userMessage).map((m) => {
-      let textContent = m.content;
+      const parts: any[] = [];
       if (m.files && m.files.length > 0) {
         m.files.forEach((f) => {
-          if (f.text) {
-            textContent += `\n\n[File: ${f.name}]\n\`\`\`\n${f.text}\n\`\`\``;
+          if (f.kind === 'image' && f.data) {
+            parts.push({
+              inlineData: {
+                mimeType: f.mt || 'image/png',
+                data: f.data,
+              },
+            });
+          } else if (f.text) {
+            parts.push({
+              text: `=== [EKLİ DOSYA: ${f.name} (${f.size || 0} bayt)] ===\n${f.text}\n=== [DOSYA SONU] ===`,
+            });
           }
         });
       }
+      if (m.content) {
+        parts.push({ text: m.content });
+      }
       return {
         role: m.role,
-        content: textContent,
+        parts: parts.length > 0 ? parts : [{ text: m.content || ' ' }],
       };
     });
 
@@ -370,6 +489,10 @@ Rules:
 
       if (!response.ok) {
         throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      if (sendingFiles.length > 0) {
+        setFileAnalysisStatus('⚡ MASTER AI dosya içeriğini analiz ediyor ve yanıt hazırlıyor...');
       }
 
       const reader = response.body?.getReader();
@@ -425,6 +548,11 @@ Rules:
         )
       );
 
+      // Auto-speak response if enabled
+      if (autoSpeakReplies && fullAssistantText) {
+        speakText(fullAssistantText, lang);
+      }
+
       // Automatically detect if game code was returned, ready for studio
       const match = /```html\s*\n([\s\S]*?)```/i.exec(fullAssistantText);
       if (match && match[1]) {
@@ -447,6 +575,7 @@ Rules:
     } finally {
       setIsStreaming(false);
       setStreamingBuffer('');
+      setFileAnalysisStatus(null);
       abortControllerRef.current = null;
     }
   };
@@ -545,7 +674,7 @@ Rules:
               name: file.name,
               kind: 'text',
               size: file.size,
-              text: (reader.result as string).slice(0, 50000),
+              text: (reader.result as string).slice(0, 100000),
             },
           ]);
         };
@@ -726,6 +855,21 @@ Rules:
               ))}
             </select>
 
+            {/* Auto-speech toggle */}
+            <button
+              type="button"
+              onClick={() => setAutoSpeakReplies(!autoSpeakReplies)}
+              className={`p-2 rounded-xl border text-xs font-medium transition-all flex items-center gap-1.5 ${
+                autoSpeakReplies
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 ring-1 ring-emerald-500/30'
+                  : 'bg-[var(--in)] border-[var(--bd)] text-[var(--mu)] hover:text-[var(--tx)]'
+              }`}
+              title={autoSpeakReplies ? 'Otomatik Sesli Yanıt: Açık' : 'Otomatik Sesli Yanıt: Kapalı'}
+            >
+              {autoSpeakReplies ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5" />}
+              <span className="hidden md:inline">{autoSpeakReplies ? 'Ses: Açık' : 'Ses: Kapalı'}</span>
+            </button>
+
             {/* Quick Emoji On/Off Button */}
             <button
               onClick={() =>
@@ -738,7 +882,7 @@ Rules:
               }`}
               title={themeSettings.allowEmojis ? 'Emojileri Kapat' : 'Emojileri Aç'}
             >
-              {themeSettings.allowEmojis ? '😃 EMOJİ: AÇIK' : '🚫 EMOJİ: KAPALI'}
+              {themeSettings.allowEmojis ? '🙂 EMOJİ: AÇIK' : '🚫 EMOJİ: KAPALI'}
             </button>
 
             {/* Live Studio Toggle Button with Clear Exit State */}
@@ -773,16 +917,22 @@ Rules:
         {/* Chat Stream / Hero Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="max-w-[var(--mw)] mx-auto flex flex-col gap-4">
-            {/* When Empty: Hero Screen */}
+            {/* When Empty: Hero Screen (Clean and Pure by default) */}
             {(!currentChat || currentChat.msgs.length === 0) && (
               <div className="my-auto py-12 flex flex-col items-center text-center anim-pop">
-                <Mascot
-                  size="hero"
-                  interactive={true}
-                  onTap={handleMascotTap}
-                  bubbleText={mascotBubble}
-                />
-                <h2 className="mt-4 text-2xl md:text-3xl font-extrabold brand-font bg-gradient-to-r from-[var(--tx)] via-[var(--ac)] to-[var(--ac2)] bg-clip-text text-transparent">
+                {themeSettings.showMascot ? (
+                  <Mascot
+                    size="hero"
+                    interactive={true}
+                    onTap={handleMascotTap}
+                    bubbleText={mascotBubble}
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[var(--ac)] to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 mb-3">
+                    <Sparkles className="w-7 h-7 text-white" />
+                  </div>
+                )}
+                <h2 className="mt-3 text-2xl md:text-3xl font-extrabold brand-font bg-gradient-to-r from-[var(--tx)] via-[var(--ac)] to-emerald-400 bg-clip-text text-transparent">
                   {t.heroTitle}
                 </h2>
                 <p className="mt-2 text-xs md:text-sm text-[var(--mu)] max-w-md">
@@ -848,13 +998,13 @@ Rules:
             {/* Live Streaming Assistant Message */}
             {isStreaming && (
               <div className="flex flex-col items-start anim-pop">
-                <div className="max-w-[88%] md:max-w-[80%] rounded-2xl p-4 bg-[var(--gl)] text-[var(--tx)] border border-[var(--gb)] backdrop-blur-md">
+                <div className="max-w-[88%] md:max-w-[80%] rounded-2xl p-4 bg-[var(--gl)] text-[var(--tx)] border border-[var(--gb)] backdrop-blur-md shadow-sm">
                   <div className="flex items-center gap-2 mb-2 text-xs text-[var(--ac)] font-semibold">
                     <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                    <span>MASTER AI yanıt üretiyor…</span>
+                    <span>{fileAnalysisStatus || 'MASTER AI yanıt üretiyor…'}</span>
                   </div>
                   <div className="text-sm md:text-[15px] whitespace-pre-wrap leading-relaxed">
-                    {streamingBuffer || 'Analiz ediliyor ve kodlar hazırlanıyor…'}
+                    {streamingBuffer || (fileAnalysisStatus ? 'Dosya içeriği taranıyor ve analiz ediliyor…' : 'Düşünülüyor…')}
                   </div>
                 </div>
               </div>
@@ -880,6 +1030,73 @@ Rules:
         {/* Input Bar Form */}
         <div className="p-3 md:p-4 bg-[var(--gl)]/80 backdrop-blur-2xl border-t border-[var(--gb)]">
           <div className="max-w-[var(--mw)] mx-auto flex flex-col gap-2">
+            {/* Mic Permission Warning Banner */}
+            {micPermissionDenied && (
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs anim-pop">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{micErrorMessage || 'Sesle konuşabilmek için mikrofon izni gereklidir. Lütfen tarayıcınızın adres çubuğundaki kilit simgesinden mikrofon erişimine izin verin.'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <button
+                    type="button"
+                    onClick={handleToggleMic}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold transition-colors"
+                  >
+                    Tekrar Dene
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMicPermissionDenied(false)}
+                    className="p-1 text-amber-400/70 hover:text-amber-200"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active Voice Dictation Banner */}
+            {isMicListening && (
+              <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs anim-pop">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="font-semibold">🎙️ Dinleniyor... Konuşun (sesiniz metne dökülüyor)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleStopMic();
+                      if (inputText.trim()) {
+                        handleSendMessage();
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500 text-black font-bold text-[11px] hover:bg-emerald-400 transition-colors flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Gönder</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStopMic}
+                    className="p-1 text-emerald-400/80 hover:text-white"
+                    title="Dinlemeyi Durdur"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* File Analysis Status Feedback */}
+            {fileAnalysisStatus && (
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs anim-pop">
+                <Sparkles className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                <span className="font-medium">{fileAnalysisStatus}</span>
+              </div>
+            )}
+
             {/* Mode & Attached Files Pills Bar */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {/* Mode Selector Dropdown */}
@@ -928,8 +1145,17 @@ Rules:
                   key={i}
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)]"
                 >
-                  <Paperclip className="w-3 h-3 text-[var(--ac)]" />
+                  {file.kind === 'image' ? (
+                    <FileImage className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <FileText className="w-3 h-3 text-emerald-400" />
+                  )}
                   <span className="max-w-[120px] truncate">{file.name}</span>
+                  {file.size && (
+                    <span className="text-[10px] text-[var(--mu)]">
+                      {(file.size / 1024).toFixed(0)}KB
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
@@ -954,7 +1180,7 @@ Rules:
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="p-2 text-[var(--mu)] hover:text-[var(--tx)] hover:bg-[var(--hv)] rounded-xl transition-colors shrink-0"
-                title="Dosya ekle (kod, doküman, görsel)"
+                title="Dosya veya Görsel Ekle (analiz için)"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -962,7 +1188,7 @@ Rules:
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,text/*,.js,.ts,.tsx,.jsx,.html,.css,.json,.py,.cs,.gd,.md,.svg"
+                accept="image/*,text/*,.js,.ts,.tsx,.jsx,.html,.css,.json,.py,.cs,.gd,.md,.svg,.txt,.csv,.pdf"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -978,16 +1204,30 @@ Rules:
                   }
                 }}
                 rows={1}
-                placeholder={t.inputPlaceholder}
+                placeholder={isMicListening ? 'Konuşmanız algılanıyor…' : t.inputPlaceholder}
                 className="flex-1 bg-transparent border-0 outline-none resize-none text-xs md:text-sm py-2 px-1 text-[var(--tx)] placeholder-[var(--mu)] max-h-36 overflow-y-auto leading-relaxed"
               />
 
-              {/* Voice Chat Launcher */}
+              {/* Voice Dictation (Mic) Button */}
+              <button
+                type="button"
+                onClick={handleToggleMic}
+                className={`p-2 rounded-xl transition-all shrink-0 ${
+                  isMicListening
+                    ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30'
+                    : 'text-[var(--mu)] hover:text-emerald-400 hover:bg-[var(--hv)]'
+                }`}
+                title={isMicListening ? 'Dinlemeyi Durdur' : 'Sesle Konuş / Yazdır'}
+              >
+                {isMicListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+
+              {/* Full Voice Chat Overlay Launcher */}
               <button
                 type="button"
                 onClick={() => setIsVoiceOpen(true)}
                 className="p-2 text-[var(--mu)] hover:text-[var(--ac)] hover:bg-[var(--hv)] rounded-xl transition-colors shrink-0"
-                title="Canlı Sesli Sohbet"
+                title="Canlı Karşılıklı Sesli Sohbet"
               >
                 <Headphones className="w-5 h-5" />
               </button>

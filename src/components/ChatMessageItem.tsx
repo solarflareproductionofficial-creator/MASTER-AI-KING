@@ -241,18 +241,41 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} anim-pop group`}>
       {/* Attached Files for User */}
       {isUser && message.files && message.files.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end">
+        <div className="flex flex-wrap gap-2 mb-2 justify-end max-w-[85%]">
           {message.files.map((file, fIdx) => (
             <div
               key={fIdx}
-              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[var(--in)] border border-[var(--bd)] text-[var(--mu)]"
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] shadow-xs"
             >
-              {file.kind === 'image' ? (
-                <FileImage className="w-3 h-3 text-[var(--ac)]" />
+              {file.kind === 'image' && file.data ? (
+                <div className="flex items-center gap-2">
+                  <img
+                    src={`data:${file.mt || 'image/png'};base64,${file.data}`}
+                    alt={file.name}
+                    className="w-7 h-7 rounded-lg object-cover border border-[var(--bd)]"
+                  />
+                  <div className="flex flex-col text-left">
+                    <span className="font-medium max-w-[140px] truncate">{file.name}</span>
+                    <span className="text-[10px] text-[var(--mu)]">
+                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : 'Görsel'} • İncelendi
+                    </span>
+                  </div>
+                </div>
               ) : (
-                <FileText className="w-3 h-3 text-[var(--ac)]" />
+                <div className="flex items-center gap-2">
+                  {file.name.match(/\.(js|ts|tsx|jsx|html|css|json|py|cs|cpp|php)$/i) ? (
+                    <FileCode className="w-4 h-4 text-[var(--ac)]" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-[var(--ac)]" />
+                  )}
+                  <div className="flex flex-col text-left">
+                    <span className="font-medium max-w-[140px] truncate">{file.name}</span>
+                    <span className="text-[10px] text-[var(--mu)]">
+                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : 'Belge'} • Analiz Edildi
+                    </span>
+                  </div>
+                </div>
               )}
-              <span className="max-w-[140px] truncate">{file.name}</span>
             </div>
           ))}
         </div>

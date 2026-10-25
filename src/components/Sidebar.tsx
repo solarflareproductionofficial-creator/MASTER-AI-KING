@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Puzzle,
@@ -6,6 +6,7 @@ import {
   Settings,
   Shield,
   Search,
+  X,
   MessageSquare,
   Edit2,
   Trash2,
@@ -62,12 +63,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredChats = chats.filter(
-    (c) =>
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.msgs.some((m) => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Global Ctrl+K / Cmd+K to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredChats = chats.filter((c) => {
+    if (!trimmedQuery) return true;
+    return (
+      c.title.toLowerCase().includes(trimmedQuery) ||
+      c.msgs.some((m) => m.content.toLowerCase().includes(trimmedQuery))
+    );
+  });
 
   const startRename = (id: string, currentTitle: string) => {
     setEditingChatId(id);
@@ -79,6 +98,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       onRenameChat(id, editTitle.trim());
     }
     setEditingChatId(null);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    searchInputRef.current?.focus();
   };
 
   return (
@@ -148,28 +172,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Search Input */}
+        {/* Search Input Bar */}
         <div className="relative my-2">
-          <Search className="w-3.5 h-3.5 text-[var(--mu)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-3.5 h-3.5 text-[var(--mu)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
-            type="search"
+            ref={searchInputRef}
+            type="text"
             placeholder={t.searchChats}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] placeholder-[var(--mu)] focus:outline-none focus:border-[var(--ac)] transition-colors"
+            className="w-full pl-8 pr-16 py-1.5 text-xs rounded-xl bg-[var(--in)] border border-[var(--bd)] text-[var(--tx)] placeholder-[var(--mu)] focus:outline-none focus:border-[var(--ac)] transition-all"
           />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {searchQuery ? (
+              <>
+                <span className="text-[10px] font-medium text-[var(--ac)] px-1 rounded bg-[var(--ac)]/10">
+                  {filteredChats.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="p-0.5 rounded text-[var(--mu)] hover:text-[var(--tx)] hover:bg-[var(--hv)] transition-colors"
+                  title="Temizle"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <span className="hidden sm:inline-block text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-[var(--bd)]/50 text-[var(--mu)] pointer-events-none">
+                ⌘K
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Chat History List */}
         <div className="flex-1 overflow-y-auto space-y-1 py-1 pr-1">
-          {filteredChats.length === 0 ? (
-            <div className="text-center py-8 text-xs text-[var(--mu)]">
-              {searchQuery ? 'Sohbet bulunamadı' : 'Henüz sohbet yok'}
+          {chats.length === 0 ? (
+            <div className="text-center py-8 text-xs text-[var(--mu)] space-y-2">
+              <p>Henüz sohbet yok</p>
+              <button
+                onClick={onNewChat}
+                className="inline-flex items-center gap-1 text-[11px] text-[var(--ac)] hover:underline"
+              >
+                <Plus className="w-3 h-3" /> Yeni sohbet başlat
+              </button>
+            </div>
+          ) : filteredChats.length === 0 ? (
+            <div className="text-center py-8 px-2 text-xs text-[var(--mu)] space-y-2">
+              <p>"{searchQuery}" ile eşleşen sohbet bulunamadı</p>
+              <button
+                onClick={clearSearch}
+                className="inline-flex items-center gap-1 text-[11px] text-[var(--ac)] font-medium px-2.5 py-1 rounded-lg bg-[var(--ac)]/10 hover:bg-[var(--ac)]/20 transition-colors"
+              >
+                <X className="w-3 h-3" /> Aramayı Temizle
+              </button>
             </div>
           ) : (
             filteredChats.map((c) => {
               const isActive = c.id === currentChatId;
               const isEditing = editingChatId === c.id;
+              const matchedMsg = trimmedQuery
+                ? c.msgs.find((m) => m.content.toLowerCase().includes(trimmedQuery))
+                : null;
 
               return (
                 <div
@@ -181,29 +246,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                   onClick={() => onSelectChat(c.id)}
                 >
-                  <div className="flex items-center gap-2 flex-1 min-w-0 mr-1">
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0 text-[var(--ac)]" />
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editTitle}
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') finishRename(c.id);
-                          if (e.key === 'Escape') setEditingChatId(null);
-                        }}
-                        onBlur={() => finishRename(c.id)}
-                        className="w-full bg-[var(--in)] border border-[var(--ac)] rounded px-1.5 py-0.5 text-xs text-[var(--tx)] focus:outline-none"
-                      />
-                    ) : (
-                      <span className="truncate">{formatWithEmojiPreference(c.title, allowEmojis)}</span>
-                    )}
+                  <div className="flex items-start gap-2 flex-1 min-w-0 mr-1">
+                    <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[var(--ac)]" />
+                    <div className="flex-1 min-w-0">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editTitle}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') finishRename(c.id);
+                            if (e.key === 'Escape') setEditingChatId(null);
+                          }}
+                          onBlur={() => finishRename(c.id)}
+                          className="w-full bg-[var(--in)] border border-[var(--ac)] rounded px-1.5 py-0.5 text-xs text-[var(--tx)] focus:outline-none"
+                        />
+                      ) : (
+                        <>
+                          <div className="truncate font-medium text-[var(--tx)]">
+                            {formatWithEmojiPreference(c.title, allowEmojis)}
+                          </div>
+                          {matchedMsg && trimmedQuery && (
+                            <div className="text-[10px] text-[var(--mu)] truncate mt-0.5 opacity-80">
+                              💬 {matchedMsg.content.slice(0, 40)}…
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {!isEditing && (
-                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
+                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1 shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

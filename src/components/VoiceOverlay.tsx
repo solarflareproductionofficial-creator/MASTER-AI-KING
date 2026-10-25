@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, SkipForward, X, Settings2, Volume2 } from 'lucide-react';
+import { Mic, MicOff, SkipForward, X, Settings2, Sparkles, AlertCircle } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../data/translations';
-import { Mascot } from './Mascot';
+import { requestMicrophonePermission } from '../utils/speech';
 
 interface VoiceOverlayProps {
   isOpen: boolean;
@@ -24,57 +24,75 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
   const t = TRANSLATIONS[lang]?.voice || TRANSLATIONS.en.voice;
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [permError, setPermError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState('');
   const [speechRate, setSpeechRate] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  // Initialize Speech Recognition
+  // Initialize Speech Recognition with explicit permission request
   useEffect(() => {
     if (!isOpen) return;
 
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRec) return;
+    let active = true;
 
-    try {
-      const recognition = new SpeechRec();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = { tr: 'tr-TR', en: 'en-US', de: 'de-DE', es: 'es-ES' }[lang] || 'en-US';
+    async function initVoice() {
+      const perm = await requestMicrophonePermission();
+      if (!active) return;
+      if (!perm.ok) {
+        setPermError(perm.error || 'Mikrofon izni verilmedi.');
+        return;
+      }
+      setPermError(null);
 
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => {
-        setIsListening(false);
-        // Restart if still open and not muted
-        if (isOpen && !isMuted) {
-          try {
-            recognition.start();
-          } catch {}
-        }
-      };
+      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRec) {
+        setPermError('Tarayıcınız sesli konuşma tanımayı desteklemiyor.');
+        return;
+      }
 
-      recognition.onresult = (event: any) => {
-        let currentText = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          currentText += event.results[i][0].transcript;
-        }
-        setTranscript(currentText);
+      try {
+        const recognition = new SpeechRec();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = { tr: 'tr-TR', en: 'en-US', de: 'de-DE', es: 'es-ES' }[lang] || 'en-US';
 
-        // Commit speech if final
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal && currentText.trim()) {
-          onSendTranscript(currentText.trim());
-          setTranscript('');
-        }
-      };
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => {
+          setIsListening(false);
+          if (isOpen && !isMuted) {
+            try {
+              recognition.start();
+            } catch {}
+          }
+        };
 
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (err) {
-      console.warn('Speech recognition start failed:', err);
+        recognition.onresult = (event: any) => {
+          let currentText = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            currentText += event.results[i][0].transcript;
+          }
+          setTranscript(currentText);
+
+          // Commit speech if final
+          const lastResult = event.results[event.results.length - 1];
+          if (lastResult.isFinal && currentText.trim()) {
+            onSendTranscript(currentText.trim());
+            setTranscript('');
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      } catch (err) {
+        console.warn('Speech recognition start failed:', err);
+      }
     }
 
+    initVoice();
+
     return () => {
+      active = false;
       try {
         if (recognitionRef.current) {
           recognitionRef.current.stop();
@@ -89,15 +107,15 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
 
     speechSynthesis.cancel();
     const clean = lastAssistantText
-      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/```[\s\S]*?```/g, ' [kod] ')
       .replace(/[*_#`|]/g, '')
-      .slice(0, 400);
+      .slice(0, 500);
 
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = { tr: 'tr-TR', en: 'en-US', de: 'de-DE', es: 'es-ES' }[lang] || 'en-US';
     u.rate = speechRate;
     speechSynthesis.speak(u);
-  }, [lastAssistantText, isOpen]);
+  }, [lastAssistantText, isOpen, lang, speechRate]);
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
@@ -117,7 +135,7 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 bg-black/85 backdrop-blur-2xl anim-pop">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 bg-black/90 backdrop-blur-2xl anim-pop">
       {/* Top Header */}
       <div className="w-full flex items-center justify-between max-w-md">
         <button
@@ -127,7 +145,8 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
         >
           <Settings2 className="w-5 h-5" />
         </button>
-        <span className="font-bold text-sm tracking-widest text-[var(--mu)] uppercase">
+        <span className="font-bold text-xs tracking-widest text-emerald-400 uppercase flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           {t.voiceChat}
         </span>
         <button
@@ -144,7 +163,7 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
 
       {/* Settings Dropdown */}
       {showSettings && (
-        <div className="p-4 rounded-2xl bg-[var(--in)] border border-[var(--bd)] text-xs text-[var(--tx)] w-full max-w-xs space-y-3 anim-pop shadow-2xl">
+        <div className="p-4 rounded-2xl bg-[#18181b] border border-white/10 text-xs text-white w-full max-w-xs space-y-3 anim-pop shadow-2xl">
           <div>
             <label className="block mb-1 text-[var(--mu)]">{t.rate}: {speechRate}x</label>
             <input
@@ -154,39 +173,47 @@ export const VoiceOverlay: React.FC<VoiceOverlayProps> = ({
               step="0.05"
               value={speechRate}
               onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
-              className="w-full accent-[var(--ac)]"
+              className="w-full accent-emerald-400"
             />
           </div>
         </div>
       )}
 
-      {/* Pulsing Visualizer Center */}
+      {/* Pulsing Minimal Visualizer Center */}
       <div className="flex flex-col items-center justify-center text-center my-auto">
-        <div className="relative flex items-center justify-center w-52 h-52">
-          {/* Animated Glow Rings */}
-          <div
-            className={`absolute inset-0 rounded-full bg-gradient-to-tr from-emerald-500/30 to-purple-500/30 blur-2xl transition-all duration-700 ${
-              isAiBusy ? 'scale-125 animate-pulse' : isListening ? 'scale-110' : 'scale-90'
-            }`}
-          />
-          <div className="relative z-10 p-6 rounded-full bg-black/40 border border-white/10 shadow-2xl">
-            <Mascot size="hero" isBusy={isAiBusy} interactive={false} />
+        {permError ? (
+          <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 max-w-xs text-xs mb-4">
+            <AlertCircle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+            <p>{permError}</p>
           </div>
-        </div>
+        ) : (
+          <div className="relative flex items-center justify-center w-48 h-48">
+            {/* Animated Glow Rings */}
+            <div
+              className={`absolute inset-0 rounded-full bg-gradient-to-tr from-emerald-500/30 to-teal-500/20 blur-3xl transition-all duration-700 ${
+                isAiBusy ? 'scale-125 animate-pulse' : isListening ? 'scale-110' : 'scale-95'
+              }`}
+            />
+            {/* Minimal orb */}
+            <div className="relative z-10 w-28 h-28 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-2xl shadow-emerald-500/30 border border-white/20">
+              <Sparkles className={`w-12 h-12 text-white ${isAiBusy ? 'animate-spin' : isListening ? 'animate-pulse' : ''}`} />
+            </div>
+          </div>
+        )}
 
         {/* Status text */}
         <div className="mt-8">
-          <h3 className="text-xl font-bold brand-font text-white mb-2">
+          <h3 className="text-lg md:text-xl font-bold brand-font text-white mb-2">
             {isAiBusy
-              ? t.thinking
+              ? '⚡ MASTER AI Düşünüyor…'
               : isMuted
               ? 'Mikrofon Kapalı'
               : transcript
-              ? transcript
-              : t.listening}
+              ? `"${transcript}"`
+              : '🎙️ Dinleniyor… Konuşabilirsiniz'}
           </h3>
-          <p className="text-xs text-[var(--mu)] max-w-xs mx-auto">
-            Konuşarak oyun fikri sorabilir veya kodları tartışabilirsiniz.
+          <p className="text-xs text-neutral-400 max-w-xs mx-auto">
+            Günlük hayat, iş, planlama, araştırma veya kod hakkında her şeyi sorabilirsiniz.
           </p>
         </div>
       </div>

@@ -77,12 +77,15 @@ app.post('/api/chat', async (req: Request, res: Response) => {
   res.flushHeaders?.();
 
   try {
-    const contents = messages.map((m: { role: string; content: string | any[] }) => {
+    const contents = messages.map((m: { role: string; content?: string | any[]; parts?: any[] }) => {
       const role = m.role === 'assistant' ? 'model' : 'user';
-      if (typeof m.content === 'string') {
-        return { role, parts: [{ text: m.content }] };
+      if (m.parts && Array.isArray(m.parts)) {
+        return { role, parts: m.parts };
       }
-      return { role, parts: m.content };
+      if (Array.isArray(m.content)) {
+        return { role, parts: m.content };
+      }
+      return { role, parts: [{ text: String(m.content || '') }] };
     });
 
     const temperature = mode === 'idea' || mode === 'brainstorm' ? 0.9 : 0.6;
